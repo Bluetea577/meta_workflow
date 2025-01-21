@@ -1,0 +1,61 @@
+configfile: "../config/config.yaml"
+
+import os
+import re
+import sys
+import tempfile
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+workflow_folder = os.path.dirname(os.path.abspath(workflow.snakefile))
+sys.path.append(os.path.join(workflow_folder, "scripts"))
+
+WORKDIR = os.path.join(config["path"]["user_root"], config["path"]["meta_path"])
+
+# 读取id配置至IDS
+SAMPLES_TABLE = pd.read_csv(os.path.join(WORKDIR, config["samples"]["id"]), index_col=0, sep='\t')
+
+IDS = SAMPLES_TABLE.index.tolist()
+
+from scripts.default_values import *
+
+include: "rules/env_build.smk"
+include: "rules/sra_download.smk"
+include: "rules/clean_data.smk"
+include: "rules/assembly.smk"
+include: "rules/binning.smk"
+include: "rules/drep.smk"
+include: "rules/mags.smk"
+include: "rules/gtdbtk.smk"
+include: "rules/prokka.smk"
+
+rule all:
+    input:
+        expand(SRA_RUN + "/{sra_run}/{sra_run}{frac}.fastq.gz", sra_run=IDS, frac=Sra_frac),
+        expand(CLEAN_RUN + "/{sra_run}/{sra_run}_kneaddata{frac}.fastq.gz", sra_run=IDS, frac = Sra_frac),
+        expand(ASSE_RUN + "/megahit/{sra_run}/{sra_run}_final_contigs.fasta", sra_run=IDS),
+        WORKDIR+ "reports/assembly_report.html",
+        expand(BIN_RUN + "/metabat/{sra_run}/bin", sra_run=IDS),
+        expand(BIN_RUN + "/metabat/{sra_run}/checkm2_report.tsv", sra_run=IDS),
+        WORKDIR+ "reports/bin_report_metabat.html",
+        BIN_RUN+ "/bin_abundances/species_abundance_matrix.tsv",
+        GTDB_DIR + "/gtdbtk_complete",
+        GTDB_DIR+ "/phylogeny/fasttree.nwk",
+        PROKKA_DIR+ "/annotation_statistics.txt",
+        PROKKA_DIR + "/all_proteins.faa",
+        PROKKA_DIR + "/all_genes.ffn",
+        PROKKA_DIR + "/all_annotations.tsv",
+
+for r in workflow.rules:
+    if not "mem_mb" in r.resources:
+        # default
+        r.resources["mem_mb"] = config["mem"] * 1000
+
+    # add time if ot present. Simple jobs use simple time
+
+    if "time_min" not in r.resources:
+        r.resources["time_min"] = config["runtime"]["default"] * 60
+
+    if not "runtime" in r.resources:
+        r.resources["runtime"] = r.resources["time_min"]
