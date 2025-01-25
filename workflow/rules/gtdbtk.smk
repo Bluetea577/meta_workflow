@@ -126,7 +126,7 @@ rule upload_gtdbtk:
     params:
         remote_dir="taxonomy/gtdbtk"
     conda:
-        config["upload"]
+        "../envs/baiduyun.yaml"
     retries: 3
     log:
         "logs/gtdbtk/upload.log"

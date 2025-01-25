@@ -144,7 +144,7 @@ rule upload_prokka:
         remote_dir="annotation/prokka",
         prokka_dir=PROKKA_DIR
     conda:
-        config["upload"]
+        "../envs/baiduyun.yaml"
     retries: 3
     log:
         "logs/prokka/upload.log"

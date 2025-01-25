@@ -28,6 +28,7 @@ rule run_drep:
         quality=BIN_RUN + "/metabat/filtered/filtered_bins_info_for_drep.csv"
     output:
         workdir=directory(BIN_RUN + "/derep/workdir"),
+        genome_dir=directory(BIN_RUN + "/derep/workdir/dereplicated_genomes"),
     log:
         "logs/binning/drep/drep.log"
     params:
@@ -208,7 +209,7 @@ rule upload_drep:
     params:
         remote_dir="binning/derep"
     conda:
-        config["upload"]
+        "../envs/baiduyun.yaml"
     log:
         "logs/binning/upload/drep.log"
     shell:
@@ -229,7 +230,7 @@ rule upload_drep_report:
     params:
         remote_dir="binning/report"
     conda:
-        config["upload"]
+        "../envs/baiduyun.yaml"
     log:
         "logs/binning/upload/drep_report.log"
     shell:

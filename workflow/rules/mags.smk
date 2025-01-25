@@ -321,7 +321,7 @@ rule upload_abundances:
     params:
         remote_dir="binning/abundance"
     conda:
-        config["upload"]
+        "../envs/baiduyun.yaml"
     log:
         "logs/binning/upload/abundance.log"
     shell:

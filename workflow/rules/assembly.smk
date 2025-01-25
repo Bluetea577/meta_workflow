@@ -137,7 +137,7 @@ rule align_reads_to_contigs:
     benchmark:
         "logs/benchmarks/assembly/align/{sra_run}.tsv"
     log:
-        "logs/assembly/megahit/{sra_run}.log",
+        "logs/assembly/megahit/{sra_run}_align.log",
     conda:
         "../envs/align.yaml",
     threads: 16
@@ -209,13 +209,13 @@ rule pileup_contigs_sample:
 
 rule create_bam_index:
     input:
-        "{file}.bam",
+        ASSE_RUN + "/megahit/{sra_run}/sequence_alignment/{sra_run}_sort.bam",
     output:
-        "{file}.bam.bai",
+        ASSE_RUN + "/megahit/{sra_run}/sequence_alignment/{sra_run}_sort.bam.bai",
     conda:
         "../envs/assembly_rep.yaml"
     log: 
-        "logs/{file}.log"
+        "logs/assembly/megahit/{sra_run}_index.log"
     threads: 4
     resources:
         mem_mb=8000,
@@ -363,7 +363,7 @@ rule upload_assembly:
     params:
         remote_dir = "assembly/{sra_run}"
     conda:
-        config["upload"]
+        "../envs/baiduyun.yaml"
     log:
         "logs/assembly/upload/{sra_run}.log"
     shell:
@@ -395,7 +395,7 @@ rule upload_assembly_report:
     params:
         remote_dir = "assembly/report"
     conda:
-        config["upload"]
+        "../envs/baiduyun.yaml"
     log:
         "logs/assembly/upload_report.log"
     shell:

@@ -346,7 +346,7 @@ rule upload_bins:
     params:
         remote_dir="binning/{sra_run}"
     conda:
-        config["upload"]
+        "../envs/baiduyun.yaml"
     log:
         "logs/binning/upload/{sra_run}.log"
     shell:
@@ -380,7 +380,7 @@ rule upload_bin_report:
     params:
         remote_dir="binning/report"
     conda:
-        config["upload"]
+        "../envs/baiduyun.yaml"
     log:
         "logs/binning/upload_report.log"
     shell:

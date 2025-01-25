@@ -212,7 +212,8 @@ rule cleandata_nor:
         expand(CLEAN_RUN + "/{{sra_run}}_temp/{{sra_run}}_kneaddata{frac}.fastq.gz",frac=Sra_frac),
     output:
         temp(expand(CLEAN_RUN + "/{{sra_run}}/{{sra_run}}_kneaddata{frac}.fastq.gz",frac=Sra_frac)),
-        mark=touch(CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.done")  # 添加完成标记
+        CLEAN_RUN+ "/{sra_run}/{sra_run}.tsv",
+        mark=touch(CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.done"),  # 添加完成标记
     params:
         inputdir=CLEAN_RUN + "/{sra_run}_temp",
         mvitem=lambda wc, input, output: mv_item(wc, input, output)
@@ -241,7 +242,7 @@ rule upload_clean_data:
         "logs/cleandata/upload/{sra_run}.log"
     threads: 1
     conda:
-        config["upload"]
+        "../envs/baiduyun.yaml"
     shell:
         """  
         bypy mkdir {params.remote_dir} 2>> {log}  

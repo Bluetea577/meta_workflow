@@ -22,7 +22,7 @@ runtime: #in h
 
 path:
   user_root:
-    ../
+    /path/to/run_root # 注意修改
   meta_path:
     meta_run/
   sra_path:
@@ -42,9 +42,9 @@ samples:
   id: id.txt
 
 dbs:
-  human: ../../DB/hg37
+  human: ../../DB/hg37 # 注意检查
 
-database_dir: ../../DB
+database_dir: ../../DB # 注意检查
 
 host:
   base_dir: /path/to/host/database #注意修改
@@ -97,8 +97,6 @@ host:
       spinach: plant/vegetables/spinach
       tomato: plant/vegetables/tomato
 
-# 注意修改
-upload: ../../miniconda3/envs/baiduyun
 
 ###################
 # Clean
