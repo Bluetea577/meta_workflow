@@ -361,8 +361,8 @@ rule upload_bins:
         bypy upload {input.genome_stats} {params.remote_dir}/ 2>> {log}
         bypy upload {input.cluster_attribution} {params.remote_dir}/ 2>> {log}
         
-        if [ "{params.upload_gunc}" = "True" ]; then
-            bypy upload {input.gunc_report} {params.remote_dir}/ 2>> {log}
+        if [ -f "{input.gunc_report}" ]; then  
+            bypy upload {input.gunc_report} {params.remote_dir}/ 2>> {log}  
         fi
         """
 
