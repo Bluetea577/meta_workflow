@@ -246,11 +246,13 @@ rule upload_clean_data:
     shell:
         """  
         bypy mkdir {params.remote_dir} 2>> {log}  
+        
+        for f in {input.fastqs}; do  
+            bypy upload "$f" {params.remote_dir}/ 2>> {log}  
+            bypy compare "$f" {params.remote_dir}/ 2>> {log}  
+        done 
     
-        bypy upload {input.fastqs} {params.remote_dir}/ 2>> {log}  
         bypy upload {input.stats} {params.remote_dir}/ 2>> {log}  
-    
-        bypy compare {input.fastqs} {params.remote_dir}/ 2>> {log}  
         bypy compare {input.stats} {params.remote_dir}/ 2>> {log}  
         """
 

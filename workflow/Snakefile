@@ -32,7 +32,7 @@ include: "rules/prokka.smk"
 
 rule all:
     input:
-        SRA_RUN + "rule_sra_download.done",
+        SRA_RUN + "/rule_sra_download.done",
         CLEAN_RUN+ "/rule_clean_data.done",
         ASSE_RUN+ "/rule_assembly.done",
         BIN_RUN+ "/rule_binning.done",

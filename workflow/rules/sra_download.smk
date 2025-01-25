@@ -80,7 +80,7 @@ rule finish_sra_download:
     input:
         marks=expand(SRA_RUN + "/{sra_run}/.{sra_run}.sra_download.done", sra_run=IDS)
     output:
-        touch(SRA_RUN + "rule_sra_download.done")
+        touch(SRA_RUN + "/rule_sra_download.done")
 
 # checkpoint extract_run:
 #     input:

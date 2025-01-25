@@ -51,26 +51,22 @@ rule calculate_contig_coverage:
 
             for(i in depth) {{  
                 coverage = depth[i]/bases[i]  
-                reads = contig_reads[i]  # 使用实际的reads数  
+                reads = contig_reads[i]  
                 rpk = (reads * 1000.0)/bases[i]  
                 rpk_values[i] = rpk  
                 rpk_sum += rpk  
 
-                # 保存数据  
                 reads_count[i] = reads  
                 coverage_values[i] = coverage  
                 length_values[i] = bases[i]  
 
-                # 统计信息  
                 total_length += bases[i]  
                 if(coverage > max_coverage) max_coverage = coverage  
                 if(coverage < min_coverage) min_coverage = coverage  
             }}  
 
-            # 计算TPM  
             scaling_factor = rpk_sum/1000000  
 
-            # 输出结果  
             for(i in depth) {{  
                 tpm = rpk_values[i]/scaling_factor  
                 rel_abundance = (reads_count[i]/total) * 100  
@@ -78,20 +74,20 @@ rule calculate_contig_coverage:
                 print i "\t" length_values[i] "\t" coverage_values[i] "\t" reads_count[i] "\t" tpm "\t" rel_abundance  
             }}  
 
-            # 输出统计信息到log文件  
-            printf "=== Alignment Statistics ===\n" > "/dev/stderr"  
-            printf "Total reads: %d\n", total > "/dev/stderr"  
-            printf "Mapped reads: %d (%.2f%%)\n", mapped, (mapped/total)*100 > "/dev/stderr"  
-            printf "Unmapped reads: %d (%.2f%%)\n", total-mapped, ((total-mapped)/total)*100 > "/dev/stderr"  
-            printf "\n=== Contig Statistics ===\n" > "/dev/stderr"  
-            printf "Total contigs: %d\n", length(depth) > "/dev/stderr"  
-            printf "Total length: %d bp\n", total_length > "/dev/stderr"  
-            printf "Maximum coverage: %.2f\n", max_coverage > "/dev/stderr"  
-            printf "Minimum coverage: %.2f\n", min_coverage > "/dev/stderr"  
-            printf "Average coverage: %.2f\n", (rpk_sum/length(depth)) > "/dev/stderr"  
+            # 统计信息输出到stderr  
+            printf "=== Alignment Statistics ===\\n" > "/dev/stderr"  
+            printf "Total reads: %d\\n", total > "/dev/stderr"  
+            printf "Mapped reads: %d (%.2f%%)\\n", mapped, (mapped/total)*100 > "/dev/stderr"  
+            printf "Unmapped reads: %d (%.2f%%)\\n", total-mapped, ((total-mapped)/total)*100 > "/dev/stderr"  
+            printf "\\n=== Contig Statistics ===\\n" > "/dev/stderr"  
+            printf "Total contigs: %d\\n", length(depth) > "/dev/stderr"  
+            printf "Total length: %d bp\\n", total_length > "/dev/stderr"  
+            printf "Maximum coverage: %.2f\\n", max_coverage > "/dev/stderr"  
+            printf "Minimum coverage: %.2f\\n", min_coverage > "/dev/stderr"  
+            printf "Average coverage: %.2f\\n", (rpk_sum/length(depth)) > "/dev/stderr"  
         }}' > {output.coverage} 2> {log}  
 
-        rm contig_reads.tmp
+        rm contig_reads.tmp  
         """
 
 rule calculate_bin_abundance:
