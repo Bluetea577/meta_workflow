@@ -379,7 +379,6 @@ rule upload_bin_report:
         mark=touch(BIN_RUN + "/.bin_report_upload.done")
     params:
         remote_dir="binning/report",
-        upload_gunc= config.get("filter_chimieric_bins",False),
     conda:
         "../envs/baiduyun.yaml"
     log:
@@ -396,8 +395,8 @@ rule upload_bin_report:
         bypy upload {input.filtered_info} {params.remote_dir}/filtered/ 2>> {log}
         bypy upload {input.filtered_paths} {params.remote_dir}/filtered/ 2>> {log}
         
-        if [ "{params.upload_gunc}" = "True" ]; then
-            bypy upload {input.gunc_report} {params.remote_dir}/ 2>> {log}
+        if [ -f "{input.gunc_report}" ]; then  
+            bypy upload {input.gunc_report} {params.remote_dir}/ 2>> {log}  
         fi
         """
 
