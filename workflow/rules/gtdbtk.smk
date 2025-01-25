@@ -19,7 +19,7 @@ rule gtdbtk_db_preparation:
     input:
         database=DBDIR + "/gtdb_r220/gtdbtk_data.tar.gz"
     output:
-        marker=touch(DBDIR + "/gtdb_r220/extract_complete")
+        marker=touch(DBDIR + "/gtdb_r220/.db_extract_complete")
     threads: 1
     resources:
         time_min=60 * int(config.get("runtime",{"long": 10})["long"])
@@ -34,10 +34,10 @@ rule gtdbtk_db_preparation:
 rule gtdbtk_classify_wf:
     input:
         genome_dir=BIN_RUN + "/derep/workdir/dereplicated_genomes",
-        db_ready=DBDIR + "/gtdb_r220/extract_complete",
+        db_ready=DBDIR + "/gtdb_r220/.db_extract_complete",
     output:
         directory=directory(GTDB_DIR),
-        marker=touch(GTDB_DIR + "/gtdbtk_complete"),
+        marker=touch(GTDB_DIR + "/.gtdbtk_complete"),
     params:
         extension=".fasta",
         gtdb_database_path=DBDIR + "/gtdb_r220",
@@ -88,7 +88,7 @@ rule gtdbtk_infer:
 
 rule fasttree_phylogeny:
     input:
-        flags=GTDB_DIR + "/gtdbtk_complete",
+        flags=GTDB_DIR + "/.gtdbtk_complete",
     output:
         tree=GTDB_DIR + "/phylogeny/fasttree.nwk",
     params:
@@ -114,3 +114,36 @@ rule fasttree_phylogeny:
             > {output.tree} \
             2> {log}
         """
+
+rule upload_gtdbtk:
+    """上传GTDB-Tk分析结果"""
+    input:
+        gtdbtk_dir=GTDB_DIR,
+        classify_done=GTDB_DIR + "/.gtdbtk_complete",
+        tree=GTDB_DIR + "/phylogeny/fasttree.nwk"
+    output:
+        mark=touch(GTDB_DIR + "/.upload_complete")
+    params:
+        remote_dir="taxonomy/gtdbtk"
+    conda:
+        config["upload"]
+    retries: 3
+    log:
+        "logs/gtdbtk/upload.log"
+    shell:
+        """  
+        # 创建远程目录  
+        bypy mkdir {params.remote_dir} 2>> {log}  
+
+        # 上传GTDB-Tk结果  
+        bypy upload {input.gtdbtk_dir}/ {params.remote_dir}/ 2>> {log}  
+        """
+
+rule finish_gtdbtk:
+    """标记GTDB-Tk分析完成"""
+    input:
+        classify=GTDB_DIR + "/.gtdbtk_complete",
+        tree=GTDB_DIR + "/phylogeny/fasttree.nwk",
+        upload=GTDB_DIR + "/.upload_complete"
+    output:
+        touch(GTDB_DIR + "/rule_gtdbtk.done")

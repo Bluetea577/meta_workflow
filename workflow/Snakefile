@@ -32,20 +32,14 @@ include: "rules/prokka.smk"
 
 rule all:
     input:
-        expand(SRA_RUN + "/{sra_run}/{sra_run}{frac}.fastq.gz", sra_run=IDS, frac=Sra_frac),
-        expand(CLEAN_RUN + "/{sra_run}/{sra_run}_kneaddata{frac}.fastq.gz", sra_run=IDS, frac = Sra_frac),
-        expand(ASSE_RUN + "/megahit/{sra_run}/{sra_run}_final_contigs.fasta", sra_run=IDS),
-        WORKDIR+ "reports/assembly_report.html",
-        expand(BIN_RUN + "/metabat/{sra_run}/bin", sra_run=IDS),
-        expand(BIN_RUN + "/metabat/{sra_run}/checkm2_report.tsv", sra_run=IDS),
-        WORKDIR+ "reports/bin_report_metabat.html",
-        BIN_RUN+ "/bin_abundances/species_abundance_matrix.tsv",
-        GTDB_DIR + "/gtdbtk_complete",
-        GTDB_DIR+ "/phylogeny/fasttree.nwk",
-        PROKKA_DIR+ "/annotation_statistics.txt",
-        PROKKA_DIR + "/all_proteins.faa",
-        PROKKA_DIR + "/all_genes.ffn",
-        PROKKA_DIR + "/all_annotations.tsv",
+        SRA_RUN + "rule_sra_download.done",
+        CLEAN_RUN+ "/rule_clean_data.done",
+        ASSE_RUN+ "/rule_assembly.done",
+        BIN_RUN+ "/rule_binning.done",
+        BIN_RUN+ "/rule_drep.done",
+        BIN_RUN+ "/rule_mags.done",
+        GTDB_DIR+ "/rule_gtdbtk.done",
+        PROKKA_DIR+ "/rule_prokka.done",
 
 for r in workflow.rules:
     if not "mem_mb" in r.resources:

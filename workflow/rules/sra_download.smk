@@ -46,10 +46,11 @@ rule extract_run:
     input:
         flag=rules.prefetch.output
     output:
-        expand(
+        temp(expand(
             SRA_RUN + "/{{sra_run}}/{{sra_run}}{frac}.fastq.gz",
             frac=Sra_frac
-        ),
+        )),
+        mark=touch(SRA_RUN + "/{sra_run}/.{sra_run}.sra_download.done")
     params:
         outdir=SRA_RUN + "/{sra_run}",
         sra_file=SRA_RUN + "/{sra_run}/{sra_run}.sra",
@@ -72,6 +73,14 @@ rule extract_run:
         " -s {params.sra_file} &>> {log} "
         " ; "
         " rm -f {params.sra_file} 2>> {log} "
+localrules:
+    finish_sra_download,
+
+rule finish_sra_download:
+    input:
+        marks=expand(SRA_RUN + "/{sra_run}/.{sra_run}.sra_download.done", sra_run=IDS)
+    output:
+        touch(SRA_RUN + "rule_sra_download.done")
 
 # checkpoint extract_run:
 #     input:

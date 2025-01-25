@@ -80,18 +80,86 @@ def rename_item(wildcards, input, output):
 
     return out.strip()
 
+def hostdb(wildcards):
+    base_dir = config["host"]["base_dir"]
+    db_params = [f'-db {config["dbs"]["human"]}']
+
+    if 'host' not in SAMPLES_TABLE.columns:
+        return " ".join(db_params)
+
+    host = SAMPLES_TABLE.loc[wildcards.sra_run, "host"]
+    if pd.isna(host) or host in ["", "na", "none", None]:
+        return " ".join(db_params)
+
+    hosts = [h.strip().lower() for h in str(host).split(',')]
+
+    host_paths = {
+        # 水产
+        'anchovy': config["host"]["animal"]["aquatic"]["anchovy"],
+        'carp': config["host"]["animal"]["aquatic"]["carp"],
+        'catfish': config["host"]["animal"]["aquatic"]["catfish"],
+        'cod': config["host"]["animal"]["aquatic"]["cod"],
+        'oyster': config["host"]["animal"]["aquatic"]["oyster"],
+        'salmon': config["host"]["animal"]["aquatic"]["salmon"],
+        'shrimp': config["host"]["animal"]["aquatic"]["shrimp"],
+
+        # 哺乳动物
+        'buffalo': config["host"]["animal"]["mammals"]["buffalo"],
+        'cattle': config["host"]["animal"]["mammals"]["cattle"],
+        'goat': config["host"]["animal"]["mammals"]["goat"],
+        'horse': config["host"]["animal"]["mammals"]["horse"],
+        'pig': config["host"]["animal"]["mammals"]["pig"],
+        'sheep': config["host"]["animal"]["mammals"]["sheep"],
+
+        # 家禽
+        'chicken': config["host"]["animal"]["poultry"]["chicken"],
+
+        # 谷物
+        'barley': config["host"]["plant"]["grains"]["barley"],
+        'cowpea': config["host"]["plant"]["grains"]["cowpea"],
+        'rice': config["host"]["plant"]["grains"]["rice"],
+        'sorghum': config["host"]["plant"]["grains"]["sorghum"],
+        'soybean': config["host"]["plant"]["grains"]["soybean"],
+        'wheat': config["host"]["plant"]["grains"]["wheat"],
+
+        # 香料
+        'chili': config["host"]["plant"]["spices"]["chili"],
+        'cocoa': config["host"]["plant"]["spices"]["cocoa"],
+        'garlic': config["host"]["plant"]["spices"]["garlic"],
+        'mustard': config["host"]["plant"]["spices"]["mustard"],
+        'tea': config["host"]["plant"]["spices"]["tea"],
+
+        # 蔬菜
+        'cabbage': config["host"]["plant"]["vegetables"]["cabbage"],
+        'carrot': config["host"]["plant"]["vegetables"]["carrot"],
+        'cucumber': config["host"]["plant"]["vegetables"]["cucumber"],
+        'grape': config["host"]["plant"]["vegetables"]["grape"],
+        'radish': config["host"]["plant"]["vegetables"]["radish"],
+        'spinach': config["host"]["plant"]["vegetables"]["spinach"],
+        'tomato': config["host"]["plant"]["vegetables"]["tomato"]
+    }
+
+    for host in hosts:
+        if host in host_paths:
+            db_params.append(f'-db {os.path.join(base_dir,host_paths[host])}')
+        elif host not in ["", "na", "none", None]:
+            logger.warning(f"Unknown host species '{host}' for sample {wildcards.sra_run}")
+
+    return " ".join(db_params)
+
 rule kneaddata_process:
     input:
-        expand(SRA_RUN + "/{{sra_run}}/{{sra_run}}{frac}.fastq.gz", frac = Sra_frac)
+        fastqs=expand(SRA_RUN + "/{{sra_run}}/{{sra_run}}{frac}.fastq.gz", frac = Sra_frac),
+        sra_done=SRA_RUN + "/{sra_run}/.{sra_run}.sra_download.done",
     output:
         temp(expand(CLEAN_RUN + "/{{sra_run}}_temp/{{sra_run}}_kneaddata{frac}.fastq.gz", frac = Sra_frac)),
     params:
-        inputs = lambda wc, input: kneaddata_input(input),
+        inputs = lambda wc, input: kneaddata_input(input.fastqs),
         outdir=CLEAN_RUN + "/{sra_run}_temp",
-        humanref=config["dbs"]["human"],
         trimopt=config["kneaddata_opt"]["trimmomatic"],
-        gzipitem = lambda wc, input, output: gzip_item(wc,input,output),
-        renameitem = lambda wc, input, output: rename_item(wc,input,output),
+        gzipitem = lambda wc, input, output: gzip_item(wc,input.fastqs,output),
+        renameitem = lambda wc, input, output: rename_item(wc,input.fastqs,output),
+        dbs=lambda wc: hostdb(wc),
     log:
         "logs/cleandata/kneaddata/{sra_run}.log",
     benchmark:
@@ -107,7 +175,7 @@ rule kneaddata_process:
         
         kneaddata \
         {params.inputs} \
-        -db {params.humanref} \
+        {params.dbs} \
         -t {threads} \
         --output {params.outdir} \
         --trimmomatic-options {params.trimopt} \
@@ -143,7 +211,8 @@ rule cleandata_nor:
     input:
         expand(CLEAN_RUN + "/{{sra_run}}_temp/{{sra_run}}_kneaddata{frac}.fastq.gz",frac=Sra_frac),
     output:
-        expand(CLEAN_RUN + "/{{sra_run}}/{{sra_run}}_kneaddata{frac}.fastq.gz",frac=Sra_frac)
+        temp(expand(CLEAN_RUN + "/{{sra_run}}/{{sra_run}}_kneaddata{frac}.fastq.gz",frac=Sra_frac)),
+        mark=touch(CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.done")  # 添加完成标记
     params:
         inputdir=CLEAN_RUN + "/{sra_run}_temp",
         mvitem=lambda wc, input, output: mv_item(wc, input, output)
@@ -154,6 +223,43 @@ rule cleandata_nor:
         
         rm -rf {params.inputdir}
         """
+
+localrules:
+    upload_clean_data,
+    finish_clean_data,
+
+rule upload_clean_data:
+    input:
+        fastqs = expand(CLEAN_RUN + "/{{sra_run}}/{{sra_run}}_kneaddata{frac}.fastq.gz",frac=Sra_frac),
+        stats = CLEAN_RUN + "/{sra_run}/{sra_run}.tsv",
+        clean_done = CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.done",
+    output:
+        mark=touch(CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.uploaded")
+    params:
+        remote_dir="clean_data/{sra_run}"
+    log:
+        "logs/cleandata/upload/{sra_run}.log"
+    threads: 1
+    conda:
+        config["upload"]
+    shell:
+        """  
+        bypy mkdir {params.remote_dir} 2>> {log}  
+    
+        bypy upload {input.fastqs} {params.remote_dir}/ 2>> {log}  
+        bypy upload {input.stats} {params.remote_dir}/ 2>> {log}  
+    
+        bypy compare {input.fastqs} {params.remote_dir}/ 2>> {log}  
+        bypy compare {input.stats} {params.remote_dir}/ 2>> {log}  
+        """
+
+rule finish_clean_data:
+    input:
+        clean_marks=expand(CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.done",sra_run=IDS),
+        upload_marks=expand(CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.uploaded",sra_run=IDS)
+    output:
+        touch(CLEAN_RUN + "/rule_clean_data.done")
+
 
 
     # run:

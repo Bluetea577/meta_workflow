@@ -5,7 +5,7 @@ rule get_metabat_depth:
     input:
         ASSE_RUN + "/megahit/{sra_run}/sequence_alignment/{sra_run}_sort.bam",
     output:
-        BIN_RUN + "/metabat/{sra_run}/metabat_depth.txt"
+        temp(BIN_RUN + "/metabat/{sra_run}/metabat_depth.txt"),
     log:
         "logs/binning/matabat/{sra_run}_depth.log",
     benchmark:
@@ -37,7 +37,7 @@ rule metabat:
         depth_file=BIN_RUN + "/metabat/{sra_run}/metabat_depth.txt",
         fasta=ASSE_RUN + "/megahit/{sra_run}/{sra_run}_final_contigs.fasta",
     output:
-        clsfile=BIN_RUN + "/metabat/{sra_run}/{sra_run}.tmp",
+        clsfile=temp(BIN_RUN + "/metabat/{sra_run}/{sra_run}.tmp"),
     params:
         min_contig_len = config["metabat"]["min_contig_length"],
         sensitivity=get_metabat_sensitivity(),
@@ -68,7 +68,7 @@ rule get_unique_cluster_attribution:
     input:
         BIN_RUN + "/metabat/{sra_run}/{sra_run}.tmp"
     output:
-        BIN_RUN + "/metabat/{sra_run}/cluster_attribution.tsv",
+        temp(BIN_RUN + "/metabat/{sra_run}/cluster_attribution.tsv"),
     log:
         "logs/binning/metabat/{sra_run}_cluster_attribution.log",
     run:
@@ -114,7 +114,7 @@ rule run_checkm2:
         db=rules.checkm2_download_db.output,
     output:
         table=BIN_RUN + "/metabat/{sra_run}/checkm2_report.tsv",
-        faa=directory(BIN_RUN + "/metabat/{sra_run}/faa"),
+        faa=temp(directory(BIN_RUN + "/metabat/{sra_run}/faa")),
     params:
         lowmem=" --lowmem " if config["mem"] < 10 else "",
         dir=lambda wc, output: os.path.join(os.path.dirname(output.table), "checkm2"),
@@ -142,6 +142,8 @@ rule run_checkm2:
         
         cp {params.dir}/quality_report.tsv {output.table} 2>> {log}
         mv {params.dir}/protein_files {output.faa} 2>> {log}
+        
+        rm -rf {params.dir}
         """
 
 rule run_gunc:
@@ -150,7 +152,7 @@ rule run_gunc:
         fasta_dir=BIN_RUN + "/metabat/{sra_run}/faa",
     output:
         table=BIN_RUN + "/metabat/{sra_run}/gunc_report.tsv",
-        folder=directory(BIN_RUN + "/metabat/{sra_run}/gunc"),
+        folder=temp(directory(BIN_RUN + "/metabat/{sra_run}/gunc")),
     params:
         extension=".faa",
     conda:
@@ -325,6 +327,85 @@ rule quality_filter_bins:
         filter_criteria=config["genome_filter_criteria"],
     script:
         "../scripts/filter_genomes.py"
+
+localrules:
+    upload_bins,
+    upload_bin_report,
+    finish_binning,
+
+rule upload_bins:
+    input:
+        bin_dir = BIN_RUN + "/metabat/{sra_run}/bin",
+        checkm2_report = BIN_RUN + "/metabat/{sra_run}/checkm2_report.tsv",
+        gunc_report = BIN_RUN + "/metabat/{sra_run}/gunc_report.tsv" if config.get("filter_chimieric_bins", False) else [],
+        genome_stats = BIN_RUN + "/metabat/{sra_run}/genome_stats.tsv",
+        cluster_attribution = BIN_RUN + "/metabat/{sra_run}/cluster_attribution.tsv",
+        faa_dir = BIN_RUN + "/metabat/{sra_run}/faa",
+    output:
+        mark=touch(BIN_RUN + "/metabat/{sra_run}/.{sra_run}.upload.done"),
+    params:
+        remote_dir="binning/{sra_run}"
+    conda:
+        config["upload"]
+    log:
+        "logs/binning/upload/{sra_run}.log"
+    shell:
+        """  
+        bypy mkdir {params.remote_dir} 2>> {log}
+        bypy mkdir {params.remote_dir}/bin 2>> {log}
+        bypy mkdir {params.remote_dir}/faa 2>> {log}
+    
+        bypy upload {input.bin_dir}/* {params.remote_dir}/bin/ 2>> {log} 
+        bypy upload {input.faa_dir}/* {params.remote_dir}/faa/ 2>> {log}
+        bypy upload {input.checkm2_report} {params.remote_dir}/ 2>> {log}
+        bypy upload {input.genome_stats} {params.remote_dir}/ 2>> {log}
+        bypy upload {input.cluster_attribution} {params.remote_dir}/ 2>> {log}
+        
+        if [ "{params.upload_gunc}" = "True" ]; then
+            bypy upload {input.gunc_report} {params.remote_dir}/ 2>> {log}
+        fi
+        """
+
+rule upload_bin_report:
+    input:
+        bins_paths=BIN_RUN + "/metabat/bins_paths.tsv",
+        checkm2_report=BIN_RUN + "/metabat/checkm2_quality_report.tsv",
+        gunc_report=BIN_RUN + "/metabat/gunc_quality_report.tsv" if config.get("filter_chimieric_bins", False) else [],
+        genome_stats=BIN_RUN + "/metabat/genome_stats.tsv",
+        contigs2bins=BIN_RUN + "/metabat/contigs2bins.tsv.gz",
+        filtered_info=BIN_RUN + "/metabat/filtered/filtered_bins_info.tsv",
+        filtered_paths=BIN_RUN + "/metabat/filtered/filtered_bins_paths.txt"
+    output:
+        mark=touch(BIN_RUN + "/.bin_report_upload.done")
+    params:
+        remote_dir="binning/report"
+    conda:
+        config["upload"]
+    log:
+        "logs/binning/upload_report.log"
+    shell:
+        """  
+        bypy mkdir {params.remote_dir} 2>> {log}
+        bypy mkdir {params.remote_dir}/filtered 2>> {log}
+
+        bypy upload {input.bins_paths} {params.remote_dir}/ 2>> {log}
+        bypy upload {input.checkm2_report} {params.remote_dir}/ 2>> {log}
+        bypy upload {input.genome_stats} {params.remote_dir}/ 2>> {log}
+        bypy upload {input.contigs2bins} {params.remote_dir}/ 2>> {log}
+        bypy upload {input.filtered_info} {params.remote_dir}/filtered/ 2>> {log}
+        bypy upload {input.filtered_paths} {params.remote_dir}/filtered/ 2>> {log}
+        
+        if [ "{params.upload_gunc}" = "True" ]; then
+            bypy upload {input.gunc_report} {params.remote_dir}/ 2>> {log}
+        fi
+        """
+
+rule finish_binning:
+    input:
+        upload_done=expand(BIN_RUN + "/metabat/{sra_run}/.{sra_run}.upload.done",sra_run=IDS),
+        report_upload_done=BIN_RUN + "/.bin_report_upload.done"
+    output:
+        touch(BIN_RUN + "/rule_binning.done")
 
 # rule build_bin_report:
 #     input:

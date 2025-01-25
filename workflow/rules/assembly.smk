@@ -31,6 +31,7 @@ rule run_megahit:
         low_local_ratio=config["megahit_low_local_ratio"],
         outdir=lambda wc, output: os.path.dirname(output[0]),
         inputs=lambda wc, input: megahit_input(input),
+        intermediate_contigs=ASSE_RUN + "/megahit/{sra_run}/intermediate_contigs"
     conda:
         "../envs/megahit.yaml"
     threads: config["assembly_threads"]
@@ -54,6 +55,8 @@ rule run_megahit:
         --prune-level {params.prune_level} \
         --low-local-ratio {params.low_local_ratio} \
         --memory {resources.mem_mb}000000 >> {log} 2>&1
+        
+        rm -rf {params.intermediate_contigs}
         """
 
 localrules: rename_megahit_output,
@@ -62,7 +65,7 @@ rule rename_megahit_output:
     input:
         ASSE_RUN + "/megahit/{sra_run}/{sra_run}_prefilter.contigs.fa",
     output:
-        ASSE_RUN + "/megahit/{sra_run}/{sra_run}_raw_contigs.fasta",
+        temp(ASSE_RUN + "/megahit/{sra_run}/{sra_run}_raw_contigs.fasta"),
     shell:
         "cp {input} {output}"
 
@@ -159,6 +162,9 @@ rule align_reads_to_contigs:
         --threads {threads} \
         -o - > {output} \
         2>> {log}
+        
+        echo "Cleaning up index files..." 2>> {log}  
+        rm -f {params.ref_out}*.bt2 2>> {log}
         """
 
 rule pileup_contigs_sample:
@@ -220,9 +226,9 @@ rule predict_genes:
     input:
         ASSE_RUN + "/megahit/{sra_run}/{sra_run}_final_contigs.fasta",
     output:
-        fna=ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.fna",
-        faa=ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.faa",
-        gff=ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.gff",
+        fna=temp(ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.fna"),
+        faa=temp(ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.faa"),
+        gff=temp(ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.gff"),
     conda:
         "../envs/prodigal.yaml"
     log:
@@ -305,6 +311,7 @@ rule combine_contig_stats:
         bams=expand(ASSE_RUN + "/megahit/{sra_run}/sequence_alignment/{sra_run}_sort.bam", sra_run=IDS),
     output:
         combined_contig_stats=WORKDIR + "stats/combined_contig_stats.tsv",
+        mark= touch(WORKDIR + "stats/.combined_stats.done"),
     params:
         samples=IDS,
     log:
@@ -317,8 +324,10 @@ rule combine_contig_stats:
 rule build_assembly_report:
     input:
         combined_contig_stats=WORKDIR + "stats/combined_contig_stats.tsv",
+        stats_done= WORKDIR + "stats/.combined_stats.done",
     output:
         report=WORKDIR + "reports/assembly_report.html",
+        mark= touch(WORKDIR + "reports/.assembly_report.done"),
     conda:
         "../envs/report.yaml"
     log:
@@ -326,4 +335,81 @@ rule build_assembly_report:
     script:
         "../scripts/assembly_report.py"
 
+localrules:
+    upload_assembly,
+    upload_assembly_report,
+    finish_assembly,
 
+rule upload_assembly:
+    input:
+        contigs = ASSE_RUN + "/megahit/{sra_run}/{sra_run}_final_contigs.fasta",
+        stats = ASSE_RUN + "/megahit/{sra_run}/final_contig_stats.txt",
+        mapping = ASSE_RUN + "/megahit/{sra_run}/old2new_contig_names.tsv",
+        bam = ASSE_RUN + "/megahit/{sra_run}/sequence_alignment/{sra_run}_sort.bam",
+        bai = ASSE_RUN + "/megahit/{sra_run}/sequence_alignment/{sra_run}_sort.bam.bai",
+        coverage_files = [
+            ASSE_RUN + "/megahit/{sra_run}/contig_stats/postfilter_coverage_histogram.txt",
+            ASSE_RUN + "/megahit/{sra_run}/contig_stats/postfilter_coverage_stats.txt",
+            ASSE_RUN + "/megahit/{sra_run}/contig_stats/postfilter_coverage_binned.txt"
+        ],
+        predicted_genes = [
+            ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.faa",
+            ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.fna",
+            ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.gff",
+            ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.tsv",
+        ],
+    output:
+        mark = touch(ASSE_RUN + "/megahit/{sra_run}/.{sra_run}.upload.done")
+    params:
+        remote_dir = "assembly/{sra_run}"
+    conda:
+        config["upload"]
+    log:
+        "logs/assembly/upload/{sra_run}.log"
+    shell:
+        """  
+        # 创建远程目录  
+        bypy mkdir {params.remote_dir} 2>> {log}  
+        bypy mkdir {params.remote_dir}/contig_stats 2>> {log}  
+        bypy mkdir {params.remote_dir}/sequence_alignment 2>> {log}  
+        bypy mkdir {params.remote_dir}/predicted_genes 2>> {log}  
+
+        # 上传文件  
+        bypy upload {input.contigs} {params.remote_dir}/ 2>> {log}  
+        bypy upload {input.stats} {params.remote_dir}/ 2>> {log}  
+        bypy upload {input.mapping} {params.remote_dir}/ 2>> {log}  
+        bypy upload {input.bam} {params.remote_dir}/sequence_alignment/ 2>> {log}  
+        bypy upload {input.bai} {params.remote_dir}/sequence_alignment/ 2>> {log}  
+        bypy upload {input.coverage_files} {params.remote_dir}/contig_stats/ 2>> {log}  
+        bypy upload {input.predicted_genes} {params.remote_dir}/predicted_genes/ 2>> {log}  
+        """
+
+rule upload_assembly_report:
+    input:
+        stats = WORKDIR + "stats/combined_contig_stats.tsv",
+        report = WORKDIR + "reports/assembly_report.html",
+        stats_done = WORKDIR + "stats/.combined_stats.done",
+        report_done = WORKDIR + "reports/.assembly_report.done"
+    output:
+        mark = touch(WORKDIR + ".assembly_report_upload.done")
+    params:
+        remote_dir = "assembly/report"
+    conda:
+        config["upload"]
+    log:
+        "logs/assembly/upload_report.log"
+    shell:
+        """  
+        bypy mkdir {params.remote_dir} 2>> {log}   
+
+        bypy upload {input.stats} {params.remote_dir}/ 2>> {log}  
+        bypy upload {input.report} {params.remote_dir}/ 2>> {log}  
+        """
+
+rule finish_assembly:
+    input:
+        report_done = WORKDIR + "reports/.assembly_report.done",
+        upload_done = expand(ASSE_RUN + "/megahit/{sra_run}/.{sra_run}.upload.done", sra_run=IDS),
+        report_upload_done = WORKDIR + ".assembly_report_upload.done"
+    output:
+        touch(ASSE_RUN + "/rule_assembly.done")

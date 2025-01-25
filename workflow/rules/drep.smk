@@ -192,3 +192,55 @@ rule build_bin_report:
         "logs/binning/report_binning.log",
     script:
         "../scripts/bin_report.py"
+
+localrules:
+    upload_drep,
+    upload_drep_report,
+    finish_drep,
+
+rule upload_drep:
+    input:
+        workdir=BIN_RUN + "/derep/workdir",
+        bin_info=BIN_RUN + "/derep/bin_info.tsv",
+        bins2species=BIN_RUN + "/derep/bins2species.tsv",
+    output:
+        mark=touch(BIN_RUN + "/derep/.drep.upload.done")
+    params:
+        remote_dir="binning/derep"
+    conda:
+        config["upload"]
+    log:
+        "logs/binning/upload/drep.log"
+    shell:
+        """
+        bypy mkdir {params.remote_dir} 2>> {log} 
+        bypy mkdir {params.remote_dir}/workdir 2>> {log}
+
+        bypy upload {input.workdir}/* {params.remote_dir}/workdir/ 2>> {log}
+        bypy upload {input.bin_info} {params.remote_dir}/ 2>> {log}
+        bypy upload {input.bins2species} {params.remote_dir}/ 2>> {log}
+        """
+
+rule upload_drep_report:
+    input:
+        report=WORKDIR + "reports/bin_report_metabat.html"
+    output:
+        mark=touch(BIN_RUN + "/.drep_report_upload.done")
+    params:
+        remote_dir="binning/report"
+    conda:
+        config["upload"]
+    log:
+        "logs/binning/upload/drep_report.log"
+    shell:
+        """
+        bypy mkdir {params.remote_dir} 2>> {log}
+        bypy upload {input.report} {params.remote_dir}/bin_report_metabat.html 2>> {log}
+        """
+
+rule finish_drep:
+    input:
+        drep_upload=BIN_RUN + "/derep/.drep.upload.done",
+        report_upload=BIN_RUN + "/.drep_report_upload.done"
+    output:
+        touch(BIN_RUN + "/rule_drep.done")

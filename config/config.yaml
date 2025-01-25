@@ -46,6 +46,60 @@ dbs:
 
 database_dir: ../../DB
 
+host:
+  base_dir: /path/to/host/database #注意修改
+
+  # 动物宿主
+  animal:
+    aquatic:
+      anchovy: animal/aquatic/anchovy
+      carp: animal/aquatic/carp
+      catfish: animal/aquatic/catfish
+      cod: animal/aquatic/cod
+      oyster: animal/aquatic/oyster
+      salmon: animal/aquatic/salmon
+      shrimp: animal/aquatic/shrimp
+
+    mammals:
+      buffalo: animal/mammals/buffalo
+      cattle: animal/mammals/cattle
+      goat: animal/mammals/goat
+      horse: animal/mammals/horse
+      pig: animal/mammals/pig
+      sheep: animal/mammals/sheep
+
+    poultry:
+      chicken: animal/poultry/chicken
+
+  # 植物宿主
+  plant:
+    grains:
+      barley: plant/grains/barley
+      cowpea: plant/grains/cowpea
+      rice: plant/grains/rice
+      sorghum: plant/grains/sorghum
+      soybean: plant/grains/soybean
+      wheat: plant/grains/wheat
+
+    spices:
+      chili: plant/spices/chili
+      cocoa: plant/spices/cocoa
+      garlic: plant/spices/garlic
+      mustard: plant/spices/mustard
+      tea: plant/spices/tea
+
+    vegetables:
+      cabbage: plant/vegetables/cabbage
+      carrot: plant/vegetables/carrot
+      cucumber: plant/vegetables/cucumber
+      grape: plant/vegetables/grape
+      radish: plant/vegetables/radish
+      spinach: plant/vegetables/spinach
+      tomato: plant/vegetables/tomato
+
+# 注意修改
+upload: ../../miniconda3/envs/baiduyun
+
 ###################
 # Clean
 ###################
@@ -78,7 +132,8 @@ metabat:
   min_contig_length: 1500 # metabat needs >1500
   sensitivity: sensitive
 
-genome_filter_criteria: "(Completeness >= 50) & (Contamination <= 10) & (Completeness-5*Contamination >= 50 ) & (Length_scaffolds >=50000) & (Ambigious_bases <1e6) & (N50 > 5*1e3) & (N_scaffolds < 1e3)"
+genome_filter_criteria: "(Completeness >= 50) & (Contamination <= 10) & (Completeness-5*Contamination >= 50 )"
+# "(Completeness >= 50) & (Contamination <= 10) & (Completeness-5*Contamination >= 50 ) & (Length_scaffolds >=50000) & (Ambigious_bases <1e6) & (N50 > 5*1e3) & (N_scaffolds < 1e3)"
 
 filter_chimieric_bins: true # filter chimeric bins using GUNC
 

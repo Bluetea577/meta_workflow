@@ -126,3 +126,56 @@ rule prokka_stats:
         "logs/prokka/stats.log"
     script:
         "../scripts/summarize_prokka.py"
+
+localrules:
+    upload_prokka,
+    finish_prokka,
+
+rule upload_prokka:
+    """上传Prokka注释结果"""
+    input:
+        combined_faa=PROKKA_DIR + "/all_proteins.faa",
+        combined_ffn=PROKKA_DIR + "/all_genes.ffn",
+        combined_tsv=PROKKA_DIR + "/all_annotations.tsv",
+        stats=PROKKA_DIR + "/annotation_statistics.txt"
+    output:
+        mark=touch(PROKKA_DIR + "/.upload_complete")
+    params:
+        remote_dir="annotation/prokka",
+        prokka_dir=PROKKA_DIR
+    conda:
+        config["upload"]
+    retries: 3
+    log:
+        "logs/prokka/upload.log"
+    shell:
+        """  
+        # 创建远程目录  
+        bypy mkdir {params.remote_dir} 2>> {log}  
+
+        # 上传合并后的结果文件  
+        bypy upload {input.combined_faa} {params.remote_dir}/ 2>> {log}  
+        bypy upload {input.combined_ffn} {params.remote_dir}/ 2>> {log}  
+        bypy upload {input.combined_tsv} {params.remote_dir}/ 2>> {log}  
+        bypy upload {input.stats} {params.remote_dir}/ 2>> {log}  
+
+        # 上传单个基因组的注释结果  
+        for genome_dir in {params.prokka_dir}/*/; do  
+            if [ -d "$genome_dir" ]; then  
+                genome=$(basename $genome_dir)  
+                bypy mkdir {params.remote_dir}/$genome 2>> {log}  
+                bypy upload $genome_dir/ {params.remote_dir}/$genome/ 2>> {log}  
+            fi  
+        done  
+        """
+
+rule finish_prokka:
+    """标记Prokka注释完成"""
+    input:
+        combined_faa=PROKKA_DIR + "/all_proteins.faa",
+        combined_ffn=PROKKA_DIR + "/all_genes.ffn",
+        combined_tsv=PROKKA_DIR + "/all_annotations.tsv",
+        stats=PROKKA_DIR + "/annotation_statistics.txt",
+        upload=PROKKA_DIR + "/.upload_complete"
+    output:
+        touch(PROKKA_DIR + "/rule_prokka.done")
