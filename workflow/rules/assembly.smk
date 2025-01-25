@@ -368,20 +368,26 @@ rule upload_assembly:
         "logs/assembly/upload/{sra_run}.log"
     shell:
         """  
-        # 创建远程目录  
-        bypy mkdir {params.remote_dir} 2>> {log}  
-        bypy mkdir {params.remote_dir}/contig_stats 2>> {log}  
-        bypy mkdir {params.remote_dir}/sequence_alignment 2>> {log}  
-        bypy mkdir {params.remote_dir}/predicted_genes 2>> {log}  
+        # 创建远程目录
+        bypy mkdir {params.remote_dir} 2>> {log}
+        bypy mkdir {params.remote_dir}/contig_stats 2>> {log}
+        bypy mkdir {params.remote_dir}/sequence_alignment 2>> {log}
+        bypy mkdir {params.remote_dir}/predicted_genes 2>> {log}
 
-        # 上传文件  
-        bypy upload {input.contigs} {params.remote_dir}/ 2>> {log}  
-        bypy upload {input.stats} {params.remote_dir}/ 2>> {log}  
-        bypy upload {input.mapping} {params.remote_dir}/ 2>> {log}  
-        bypy upload {input.bam} {params.remote_dir}/sequence_alignment/ 2>> {log}  
-        bypy upload {input.bai} {params.remote_dir}/sequence_alignment/ 2>> {log}  
-        bypy upload {input.coverage_files} {params.remote_dir}/contig_stats/ 2>> {log}  
-        bypy upload {input.predicted_genes} {params.remote_dir}/predicted_genes/ 2>> {log}  
+        # 上传文件
+        bypy upload {input.contigs} {params.remote_dir}/ 2>> {log}
+        bypy upload {input.stats} {params.remote_dir}/ 2>> {log}
+        bypy upload {input.mapping} {params.remote_dir}/ 2>> {log}
+        bypy upload {input.bam} {params.remote_dir}/sequence_alignment/ 2>> {log}
+        bypy upload {input.bai} {params.remote_dir}/sequence_alignment/ 2>> {log}
+        
+        for f in {input.coverage_files}; do
+            bypy upload "$f" {params.remote_dir}/contig_stats/ 2>> {log}
+        done
+
+        for f in {input.predicted_genes}; do
+            bypy upload "$f" {params.remote_dir}/predicted_genes/ 2>> {log}
+        done
         """
 
 rule upload_assembly_report:

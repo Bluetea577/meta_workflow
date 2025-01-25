@@ -378,7 +378,8 @@ rule upload_bin_report:
     output:
         mark=touch(BIN_RUN + "/.bin_report_upload.done")
     params:
-        remote_dir="binning/report"
+        remote_dir="binning/report",
+        upload_gunc= config.get("filter_chimieric_bins",False),
     conda:
         "../envs/baiduyun.yaml"
     log:
