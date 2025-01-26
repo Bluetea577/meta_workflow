@@ -217,7 +217,7 @@ rule upload_drep:
         bypy mkdir {params.remote_dir} 2>> {log} 
         bypy mkdir {params.remote_dir}/workdir 2>> {log}
 
-        bypy upload {input.workdir}/* {params.remote_dir}/workdir/ 2>> {log}
+        bypy upload {input.workdir}/ {params.remote_dir}/workdir/ 2>> {log}
         bypy upload {input.bin_info} {params.remote_dir}/ 2>> {log}
         bypy upload {input.bins2species} {params.remote_dir}/ 2>> {log}
         """
