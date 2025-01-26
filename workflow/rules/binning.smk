@@ -179,7 +179,6 @@ rule run_gunc:
         """
 
 localrules:
-    build_bin_report,
     combine_checkm2,
     combine_gunc,
 

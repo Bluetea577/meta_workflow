@@ -358,10 +358,14 @@ rule upload_assembly:
             ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.gff",
             ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.tsv",
         ],
+        clean_flags=CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.uploaded",
     output:
         mark = touch(ASSE_RUN + "/megahit/{sra_run}/.{sra_run}.upload.done")
     params:
-        remote_dir = "assembly/{sra_run}"
+        remote_dir = "assembly/{sra_run}",
+        clean_dir=CLEAN_RUN + "/{sra_run}",
+        assem_dir=ASSE_RUN + "/megahit/{sra_run}",
+        pred_dir=ASSE_RUN + "/predicted_genes/{sra_run}",
     conda:
         "../envs/baiduyun.yaml"
     log:
@@ -388,6 +392,14 @@ rule upload_assembly:
         for f in {input.predicted_genes}; do
             bypy upload "$f" {params.remote_dir}/predicted_genes/ 2>> {log}
         done
+        
+        rm -rf {params.clean_dir}/*.fastq.gz 2>> {log}
+        rm -rf {params.pred_dir}/*.faa 2>> {log}
+        rm -rf {params.pred_dir}/*.fna 2>> {log}
+        rm -rf {params.pred_dir}/*.gff 2>> {log}
+        rm -rf {params.assem_dir}/{wildcards.sra_run}_prefilter.contigs.fa 2>> {log}
+        rm -rf {params.assem_dir}/{wildcards.sra_run}_prefilter_contigs.fasta 2>> {log}
+        rm -rf {params.assem_dir}/{wildcards.sra_run}_raw_contigs.fasta 2>> {log}
         """
 
 rule upload_assembly_report:

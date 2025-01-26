@@ -237,7 +237,8 @@ rule upload_clean_data:
     output:
         mark=touch(CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.uploaded")
     params:
-        remote_dir="clean_data/{sra_run}"
+        remote_dir="clean_data/{sra_run}",
+        sra_dir=SRA_RUN + "/{sra_run}"
     log:
         "logs/cleandata/upload/{sra_run}.log"
     threads: 1
@@ -254,6 +255,8 @@ rule upload_clean_data:
     
         bypy upload {input.stats} {params.remote_dir}/ 2>> {log}  
         bypy compare {input.stats} {params.remote_dir}/ 2>> {log}  
+        
+        rm -rf {params.sra_dir}/*.fastq.gz 2>> {log} 
         """
 
 rule finish_clean_data:

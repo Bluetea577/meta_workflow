@@ -181,6 +181,9 @@ rule cluster_species:
 
 """
 
+localrules:
+    build_bin_report,
+
 rule build_bin_report:
     input:
         bin_info=BIN_RUN + "/derep/bin_info.tsv",
