@@ -355,8 +355,8 @@ rule upload_bins:
         bypy mkdir {params.remote_dir}/bin 2>> {log}
         bypy mkdir {params.remote_dir}/faa 2>> {log}
     
-        bypy upload {input.bin_dir}/* {params.remote_dir}/bin/ 2>> {log} 
-        bypy upload {input.faa_dir}/* {params.remote_dir}/faa/ 2>> {log}
+        bypy upload {input.bin_dir}/ {params.remote_dir}/bin/ 2>> {log} 
+        bypy upload {input.faa_dir}/ {params.remote_dir}/faa/ 2>> {log}
         bypy upload {input.checkm2_report} {params.remote_dir}/ 2>> {log}
         bypy upload {input.genome_stats} {params.remote_dir}/ 2>> {log}
         bypy upload {input.cluster_attribution} {params.remote_dir}/ 2>> {log}
