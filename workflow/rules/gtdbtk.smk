@@ -115,6 +115,10 @@ rule fasttree_phylogeny:
             2> {log}
         """
 
+localrules:
+    upload_gtdbtk,
+    finish_gtdbtk,
+
 rule upload_gtdbtk:
     """上传GTDB-Tk分析结果"""
     input:
