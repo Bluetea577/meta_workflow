@@ -164,7 +164,7 @@ rule align_reads_to_contigs:
         2>> {log}
         
         echo "Cleaning up index files..." 2>> {log}  
-        rm -f {params.ref_out}*.bt2 2>> {log}
+        rm -f {params.ref_out}/*.bt2 2>> {log}
         """
 
 rule pileup_contigs_sample:
