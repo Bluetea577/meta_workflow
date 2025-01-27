@@ -363,7 +363,7 @@ rule upload_assembly:
     output:
         mark = touch(ASSE_RUN + "/megahit/{sra_run}/.{sra_run}.upload.done")
     params:
-        remote_dir = "assembly/{sra_run}",
+        remote_dir = config.get("upload_tag", "") + "assembly/{sra_run}",
         clean_dir=CLEAN_RUN + "/{sra_run}",
         assem_dir=ASSE_RUN + "/megahit/{sra_run}",
         pred_dir=ASSE_RUN + "/predicted_genes/{sra_run}",
@@ -412,7 +412,7 @@ rule upload_assembly_report:
     output:
         mark = touch(ASSE_RUN + "/.assembly_report_upload.done")
     params:
-        remote_dir = "assembly/report"
+        remote_dir = config.get("upload_tag", "") + "assembly/report"
     conda:
         "../envs/baiduyun.yaml"
     log:

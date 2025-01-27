@@ -339,7 +339,7 @@ rule upload_abundances:
     output:
         mark=touch(BIN_RUN + "/.abundance_upload.done")
     params:
-        remote_dir="binning/abundance"
+        remote_dir=config.get("upload_tag", "") + "binning/abundance"
     conda:
         "../envs/baiduyun.yaml"
     log:

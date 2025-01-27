@@ -379,7 +379,7 @@ rule upload_bins:
     output:
         mark=touch(BIN_RUN + "/metabat/{sra_run}/.{sra_run}.upload.done"),
     params:
-        remote_dir="binning/{sra_run}"
+        remote_dir=config.get("upload_tag", "") + "binning/{sra_run}"
     conda:
         "../envs/baiduyun.yaml"
     log:
@@ -414,7 +414,7 @@ rule upload_bin_report:
     output:
         mark=touch(BIN_RUN + "/.bin_report_upload.done")
     params:
-        remote_dir="binning/report",
+        remote_dir=config.get("upload_tag", "") + "binning/report",
     conda:
         "../envs/baiduyun.yaml"
     log:

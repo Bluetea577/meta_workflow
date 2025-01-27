@@ -128,7 +128,7 @@ rule upload_gtdbtk:
     output:
         mark=touch(GTDB_DIR + "/.upload_complete")
     params:
-        remote_dir="taxonomy/gtdbtk"
+        remote_dir=config.get("upload_tag", "") + "taxonomy/gtdbtk"
     conda:
         "../envs/baiduyun.yaml"
     retries: 3

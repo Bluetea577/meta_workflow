@@ -237,7 +237,7 @@ rule upload_clean_data:
     output:
         mark=touch(CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.uploaded")
     params:
-        remote_dir="clean_data/{sra_run}",
+        remote_dir=config.get("upload_tag", "") + "clean_data/{sra_run}",
         sra_dir=SRA_RUN + "/{sra_run}"
     log:
         "logs/cleandata/upload/{sra_run}.log"

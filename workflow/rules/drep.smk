@@ -210,7 +210,7 @@ rule upload_drep:
     output:
         mark=touch(BIN_RUN + "/derep/.drep.upload.done")
     params:
-        remote_dir="binning/derep"
+        remote_dir=config.get("upload_tag", "") + "binning/derep"
     conda:
         "../envs/baiduyun.yaml"
     log:
@@ -231,7 +231,7 @@ rule upload_drep_report:
     output:
         mark=touch(BIN_RUN + "/.drep_report_upload.done")
     params:
-        remote_dir="binning/report"
+        remote_dir=config.get("upload_tag", "") + "binning/report"
     conda:
         "../envs/baiduyun.yaml"
     log:

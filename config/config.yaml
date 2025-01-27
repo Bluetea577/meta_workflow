@@ -46,6 +46,8 @@ dbs:
 
 database_dir: ../../DB # 注意检查
 
+upload_tag: batch1/ # 不需要请注释掉
+
 host:
   base_dir: /path/to/host/database #注意修改
 

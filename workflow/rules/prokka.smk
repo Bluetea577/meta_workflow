@@ -141,7 +141,7 @@ rule upload_prokka:
     output:
         mark=touch(PROKKA_DIR + "/.upload_complete")
     params:
-        remote_dir="annotation/prokka",
+        remote_dir=config.get("upload_tag", "") + "annotation/prokka",
         prokka_dir=PROKKA_DIR
     conda:
         "../envs/baiduyun.yaml"
