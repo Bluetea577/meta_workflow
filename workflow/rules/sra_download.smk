@@ -1,10 +1,11 @@
-localrules:
-    prefetch,
-
 wildcard_constraints:
     sra_run="[S,E,D]RR[0-9]+",
 
 SRA_RUN = os.path.join(WORKDIR, config["path"]["sra_path"])
+
+"""
+localrules:
+    prefetch,
 
 rule prefetch:
     output:
@@ -31,6 +32,7 @@ rule prefetch:
         " {wildcards.sra_run} &>> {log} "
         " ; "
         " vdb-validate {params.outdir}/{wildcards.sra_run}/{wildcards.sra_run}.sra &>> {log} "
+"""
 
 # def seq_fraction(wildcards):
 #     seq_type = SAMPLES_INDEX.loc[SAMPLES_INDEX.iloc[:, 0] == wildcards.sra_run, SAMPLES_INDEX.columns[1]].values[0]
@@ -42,6 +44,32 @@ PAIRED_END = SAMPLES_TABLE.columns.str.contains("PAIRED").any() or config.get(
 
 Sra_frac = ["_1", "_2"] if PAIRED_END else [""]
 
+localrules:
+    download_data,
+
+rule download_data:
+    output:
+        fastqs = temp(expand(
+            SRA_RUN + "/{{sra_run}}/{{sra_run}}{frac}.fastq.gz",
+            frac=Sra_frac
+        )),
+        mark = touch(SRA_RUN + "/{sra_run}/.{sra_run}.sra_download.done"),
+    params:
+        outdir = SRA_RUN + "/{sra_run}"
+    log:
+        "logs/SRAdownload/download/{sra_run}.log"
+    benchmark:
+        "logs/benchmarks/SRAdownload/download/{sra_run}.tsv"
+    conda:
+        "../envs/kingfisher.yaml"
+    shell:
+        """
+        kingfisher get -r {wildcards.sra_run} \
+            -m ena-ftp aws-http \
+            --output-directory {params.outdir} 2> {log}
+        """
+
+"""
 rule extract_run:
     input:
         flag=rules.prefetch.output
@@ -73,6 +101,8 @@ rule extract_run:
         " -s {params.sra_file} &>> {log} "
         " ; "
         " rm -f {params.sra_file} 2>> {log} "
+"""
+
 localrules:
     finish_sra_download,
 

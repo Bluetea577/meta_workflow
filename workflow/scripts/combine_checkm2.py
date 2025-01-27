@@ -59,26 +59,44 @@ def read_checkm2_output(
     return df
 
 
-def main(samples, completeness_files, bin_table):
+def main(samples, completeness_files, status_files, bin_table):
     sample_data = {}
     div = {}
 
     df_list = []
 
-    for i, sample in enumerate(samples):
-        sample_data = read_checkm2_output(completness_table=completeness_files[i])
-        sample_data["Sample"] = sample
+    for i, (sample, completeness_file, status_file) in enumerate(zip(samples, completeness_files, status_files)):
+        try:
+            with open(status_file, "r") as f:
+                status = f.read().strip()
 
-        df_list.append(sample_data)
+            if status == 'valid':
+                sample_data = read_checkm2_output(completness_table=completeness_files[i])
+                sample_data["Sample"] = sample
 
-    df = pd.concat(df_list, axis=0)
+                df_list.append(sample_data)
+                logging.info(f"Including checkm2 data for sample {sample}")
+            else:
+                logging.info(f"Skipping sample {sample} (status: {status})")
 
-    df.to_csv(bin_table, sep="\t")
+        except Exception as e:
+            logging.error(f"Error processing sample {sample}: {str(e)}")
+
+    if df_list:
+        df = pd.concat(df_list, axis=0)
+        df.to_csv(bin_table, sep="\t")
+        logging.info(f"Successfully combined {len(df_list)} valid samples")
+    else:
+        logging.warning("No valid data to combine")
+        # 创建空的输出文件
+        pd.DataFrame(columns=["Bin Id", "Completeness", "Contamination", "Quality_score", "Sample"]) \
+            .to_csv(bin_table, sep="\t", index=False)
 
 
 if __name__ == "__main__":
     main(
         samples=snakemake.params.samples,
         completeness_files=snakemake.input.completeness_files,
+        status_files=snakemake.input.status_files,
         bin_table=snakemake.output.bin_table,
     )

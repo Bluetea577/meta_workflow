@@ -51,7 +51,17 @@ def get_list_of_files(dirs, pattern):
 
     for dir in dirs:
         dir = Path(dir)
-        fasta_files += list(dir.glob(pattern))
+        if dir.exists():
+            files = list(dir.glob(pattern))
+            if files:
+                fasta_files.extend(files)
+                logging.info(f"Found {len(files)} fasta files in {dir}")
+            else:
+                logging.info(f"No fasta files found in {dir}")
+
+    if not fasta_files:
+        logging.info(f"No fasta files found in directory")
+        return pd.DataFrame()
 
     filenames = pd.DataFrame(fasta_files, columns=["Filename"])
     filenames.index = filenames.Filename.apply(simplify_path)

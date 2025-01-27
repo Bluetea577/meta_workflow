@@ -12,7 +12,7 @@ mem: 56
 simplejob_mem: 10
 simplejob_threads: 4
 
-minimum_contig_length: 1000
+minimum_contig_length: 1000 # 组装后的contigs大小筛选
 
 runtime: #in h
   default: 5
@@ -110,12 +110,12 @@ kneaddata_opt:
 # Assembly
 ###################
 # megahit_set
-megahit_min_count: 2
+megahit_min_count: 1
 megahit_k_min: 21
-megahit_k_max: 121
-megahit_k_step: 20
-megahit_merge_level: 20,0.98
-megahit_prune_level: 2
+megahit_k_max: 99
+megahit_k_step: 10
+megahit_merge_level: 20,0.95
+megahit_prune_level: 1
 megahit_low_local_ratio: 0.2
 
 assembly_threads: 8
@@ -131,8 +131,10 @@ metabat:
   min_contig_length: 1500 # metabat needs >1500
   sensitivity: sensitive
 
-genome_filter_criteria: "(Completeness >= 50) & (Contamination <= 10) & (Completeness-5*Contamination >= 50 )"
+genome_filter_criteria: "Completeness >= 0"
+# "(Completeness >= 50) & (Contamination <= 10)"
 # "(Completeness >= 50) & (Contamination <= 10) & (Completeness-5*Contamination >= 50 ) & (Length_scaffolds >=50000) & (Ambigious_bases <1e6) & (N50 > 5*1e3) & (N_scaffolds < 1e3)"
+# 设置"Completeness >= 0"以跳过genome_filter,结果用于drep
 
 filter_chimieric_bins: true # filter chimeric bins using GUNC
 
@@ -140,11 +142,11 @@ filter_chimieric_bins: true # filter chimeric bins using GUNC
 # Drep
 ####################
 drep:
-  min_completeness: 50         # 最小完整度
-  max_contamination: 10        # 最大污染度
-  primary_ani: 0.9           # 一级聚类ANI阈值
-  final_ani: 0.95          # 二级聚类ANI阈值
-  coverage_threshold: 0.3      # 覆盖度阈值
+  min_completeness: 75         # 最小完整度[75]
+  max_contamination: 25        # 最大污染度[25]
+  primary_ani: 0.9           # 一级聚类ANI阈值[0-1, 0.9]
+  final_ani: 0.95          # 二级聚类ANI阈值[0-1, 0.95]
+  coverage_threshold: 0.1      # 覆盖度阈值[0-1, 0.1]
   # extra: "--S_algorithm fastANI"  # 使用fastANI进行二级聚类
 
 genome_dereplication:

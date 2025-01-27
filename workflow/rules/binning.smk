@@ -68,7 +68,8 @@ rule get_unique_cluster_attribution:
     input:
         BIN_RUN + "/metabat/{sra_run}/{sra_run}.tmp"
     output:
-        temp(BIN_RUN + "/metabat/{sra_run}/cluster_attribution.tsv"),
+        attribution=temp(BIN_RUN + "/metabat/{sra_run}/cluster_attribution.tsv"),
+        status=BIN_RUN + "/metabat/{sra_run}/bin_status"
     log:
         "logs/binning/metabat/{sra_run}_cluster_attribution.log",
     run:
@@ -88,6 +89,11 @@ rule get_unique_cluster_attribution:
         if new_d.empty:
             logger.warning(f"No bins detected in sample {wildcards.sra_run}")
             new_d[wildcards.sra_run] = f"{wildcards.sra_run}_metabat_1"
+            with open(output.status, 'w', encoding='utf-8') as f:
+                f.write('empty')
+        else:
+            with open(output.status,'w',encoding='utf-8') as f:
+                f.write('valid')
 
         new_d.to_csv(output[0], sep="\t", header=False)
 
@@ -95,6 +101,7 @@ rule get_bins:
     input:
         cluster_attribution=BIN_RUN + "/metabat/{sra_run}/cluster_attribution.tsv",
         contigs=ASSE_RUN + "/megahit/{sra_run}/{sra_run}_final_contigs.fasta",
+        status=BIN_RUN + "/metabat/{sra_run}/bin_status",
     output:
         directory(BIN_RUN + "/metabat/{sra_run}/bin"),
     conda:
@@ -112,6 +119,7 @@ rule run_checkm2:
     input:
         fasta_dir=BIN_RUN + "/metabat/{sra_run}/bin",
         db=rules.checkm2_download_db.output,
+        status=BIN_RUN + "/metabat/{sra_run}/bin_status",
     output:
         table=BIN_RUN + "/metabat/{sra_run}/checkm2_report.tsv",
         faa=temp(directory(BIN_RUN + "/metabat/{sra_run}/faa")),
@@ -129,27 +137,34 @@ rule run_checkm2:
         time_min = 60 * int(config["runtime"]["default"]),
         mem_mb = config["mem"] * 1000,
     shell:
-        """
-        checkm2 predict \
-        --threads {threads} \
-        {params.lowmem} \
-        --force \
-        --allmodels \
-        -x .fasta \
-        --input {input.fasta_dir} \
-        --output-directory {params.dir} \
-        &> {log}
-        
-        cp {params.dir}/quality_report.tsv {output.table} 2>> {log}
-        mv {params.dir}/protein_files {output.faa} 2>> {log}
-        
-        rm -rf {params.dir}
+        """  
+        if [ $(cat {input.status}) = "empty" ]; then  
+            mkdir -p {output.faa}  
+            echo -e "Name\tCompleteness\tContamination" > {output.table}  
+            echo -e "{wildcards.sra_run}_metabat_1\t0\t0" >> {output.table}  
+        else  
+            checkm2 predict \
+            --threads {threads} \
+            {params.lowmem} \
+            --force \
+            --allmodels \
+            -x .fasta \
+            --input {input.fasta_dir} \
+            --output-directory {params.dir} \
+            &> {log}  
+            
+            cp {params.dir}/quality_report.tsv {output.table} 2>> {log}  
+            mv {params.dir}/protein_files {output.faa} 2>> {log}  
+            
+            rm -rf {params.dir}  
+        fi
         """
 
 rule run_gunc:
     input:
         db=DBDIR + "/gunc_db/gunc_db_progenomes2.1.dmnd",
         fasta_dir=BIN_RUN + "/metabat/{sra_run}/faa",
+        status=BIN_RUN + "/metabat/{sra_run}/bin_status",
     output:
         table=BIN_RUN + "/metabat/{sra_run}/gunc_report.tsv",
         folder=temp(directory(BIN_RUN + "/metabat/{sra_run}/gunc")),
@@ -165,17 +180,23 @@ rule run_gunc:
         mem_mb=config["mem"] * 1000,
     shell:
         """
-        mkdir {output.folder} 2> {log}
-        
-        gunc run \
-        --threads {threads} \
-        --gene_calls \
-        --db_file {input.db} \
-        --input_dir {input.fasta_dir} \
-        --file_suffix {params.extension} \
-        --out_dir {output.folder} &>> {log} 
-        
-        cp {output.folder}/*.tsv {output.table} 2>> {log}
+        if [ $(cat {input.status}) = "empty" ]; then  
+            mkdir -p {output.folder}  
+            echo -e "genome\tpass.GUNC\twarning" > {output.table}  
+            echo -e "{wildcards.sra_run}_metabat_1\tFalse\tEmpty bin" >> {output.table}  
+        else  
+            mkdir -p {output.folder} 2> {log}  
+            
+            gunc run \
+            --threads {threads} \
+            --gene_calls \
+            --db_file {input.db} \
+            --input_dir {input.fasta_dir} \
+            --file_suffix {params.extension} \
+            --out_dir {output.folder} &>> {log}  
+            
+            cp {output.folder}/*.tsv {output.table} 2>> {log}  
+        fi
         """
 
 localrules:
@@ -188,6 +209,10 @@ rule combine_checkm2:
             BIN_RUN + "/metabat/{sra_run}/checkm2_report.tsv",
             sra_run=IDS,
         ),
+        status_files=expand(
+            BIN_RUN + "/metabat/{sra_run}/bin_status",
+            sra_run=IDS,
+        )
     output:
         bin_table=BIN_RUN + "/metabat/checkm2_quality_report.tsv",
     params:
@@ -199,10 +224,14 @@ rule combine_checkm2:
 
 rule combine_gunc:
     input:
-        expand(
+        gunc_files=expand(
             BIN_RUN + "/metabat/{sra_run}/gunc_report.tsv",
             sra_run=IDS,
         ),
+        status_files=expand(
+            BIN_RUN + "/metabat/{sra_run}/bin_status",
+            sra_run=IDS,
+        )
     output:
         bin_table=BIN_RUN + "/metabat/gunc_quality_report.tsv",
     params:
@@ -238,33 +267,35 @@ localrules:
 
 rule all_contigs2bins:
     input:
-        expand(
+        tsv_files=expand(
             BIN_RUN + "/metabat/{sra_run}/cluster_attribution.tsv",
             sra_run=IDS,
         ),
+        status_files=expand(
+            BIN_RUN + "/metabat/{sra_run}/bin_status",
+            sra_run=IDS,
+        )
     output:
         temp(BIN_RUN + "/metabat/contigs2bins.tsv.gz"),
     run:
-        def cat_files(files, outfilename, gzip=False):
-            import shutil
+        import gzip
 
-            if gzip:
-                import gzip as gz
+        # 获取有效的文件列表
+        valid_files = [
+            tsv for tsv, status in zip(input.tsv_files,input.status_files)
+            if open(status).read().strip() == 'valid'
+        ]
 
-                outhandle = gz.open
-            else:
-                outhandle = open
-
-            with outhandle(outfilename,"wb") as f_out:
-                for f in files:
-                    with open(f,"rb") as f_in:
-                        shutil.copyfileobj(f_in,f_out)
-
-        cat_files(input, output[0], gzip=True)
+        # 合并有效文件
+        with gzip.open(output[0],'wb') as f_out:
+            for file in valid_files:
+                with open(file,'rb') as f_in:
+                    f_out.write(f_in.read())
 
 rule calculate_stats:
     input:
-        BIN_RUN + "/metabat/{sra_run}/bin",
+        bin_dir=BIN_RUN + "/metabat/{sra_run}/bin",
+        status=BIN_RUN + "/metabat/{sra_run}/bin_status",
     output:
         BIN_RUN + "/metabat/{sra_run}/genome_stats.tsv",
     threads: 16
@@ -278,8 +309,12 @@ rule calculate_stats:
 
 rule combine_bin_stats:
     input:
-        expand(
+        stats=expand(
             BIN_RUN + "/metabat/{sra_run}/genome_stats.tsv",
+            sra_run=IDS,
+        ),
+        status=expand(
+            BIN_RUN + "/metabat/{sra_run}/bin_status",
             sra_run=IDS,
         ),
     output:
@@ -340,6 +375,7 @@ rule upload_bins:
         genome_stats = BIN_RUN + "/metabat/{sra_run}/genome_stats.tsv",
         cluster_attribution = BIN_RUN + "/metabat/{sra_run}/cluster_attribution.tsv",
         faa_dir = BIN_RUN + "/metabat/{sra_run}/faa",
+        status= BIN_RUN + "/metabat/{sra_run}/bin_status",
     output:
         mark=touch(BIN_RUN + "/metabat/{sra_run}/.{sra_run}.upload.done"),
     params:
@@ -359,6 +395,7 @@ rule upload_bins:
         bypy upload {input.checkm2_report} {params.remote_dir}/ 2>> {log}
         bypy upload {input.genome_stats} {params.remote_dir}/ 2>> {log}
         bypy upload {input.cluster_attribution} {params.remote_dir}/ 2>> {log}
+        bypy upload {input.status} {params.remote_dir}/ 2>> {log}
         
         if [ -f "{input.gunc_report}" ]; then  
             bypy upload {input.gunc_report} {params.remote_dir}/ 2>> {log}  

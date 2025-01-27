@@ -256,7 +256,7 @@ rule upload_clean_data:
         bypy upload {input.stats} {params.remote_dir}/ 2>> {log}  
         bypy compare {input.stats} {params.remote_dir}/ 2>> {log}  
         
-        rm -rf {params.sra_dir}/*.fastq.gz 2>> {log} 
+        # rm -rf {params.sra_dir}/*.fastq.gz 2>> {log} 
         """
 
 rule finish_clean_data:

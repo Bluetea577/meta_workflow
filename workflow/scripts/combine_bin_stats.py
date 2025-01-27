@@ -13,6 +13,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
+import pandas as pd
 
 def handle_exception(exc_type, exc_value, exc_traceback):
     if issubclass(exc_type, KeyboardInterrupt):
@@ -41,7 +42,6 @@ def _pandas_concat_in_memory(
     save_arguments,
     concat_arguments,
 ):
-    import pandas as pd
 
     Tables = [
         pd.read_csv(file, index_col=index_col, sep=sep, **read_arguments)
@@ -66,7 +66,6 @@ def _pandas_concat_disck_based(
 ):
     """combine different tables but one after the other in disk based"""
 
-    import pandas as pd
 
     try:
         from tqdm import tqdm
@@ -90,11 +89,11 @@ def _pandas_concat_disck_based(
             selected_headers.update(list(headers_of_file.columns))
 
         selected_headers = list(selected_headers)
-        logger.info(f"Inferred following list of headers {selected_headers}")
+        logging.info(f"Inferred following list of headers {selected_headers}")
 
     # parse one file after another
 
-    logger.info("Read an append table by table")
+    logging.info("Read an append table by table")
     for file in tqdm(input_tables):
         # read full table
         table = pd.read_csv(
@@ -139,7 +138,7 @@ def pandas_concat(
     if type(input_tables) == str:
         input_tables = [input_tables]
 
-    common_arrguments = dict(
+    common_arguments = dict(
         input_tables=input_tables,
         output_table=output_table,
         sep=sep,
@@ -157,7 +156,7 @@ def pandas_concat(
         assert axis == 0, "Can only append on axis= 0"
 
         _pandas_concat_disck_based(
-            selected_headers=selected_headers, **common_arrguments
+            selected_headers=selected_headers, **common_arguments
         )
 
     else:
@@ -171,17 +170,33 @@ def pandas_concat(
             )
 
         _pandas_concat_in_memory(
-            axis=axis, concat_arguments=concat_arguments, **common_arrguments
+            axis=axis, concat_arguments=concat_arguments, **common_arguments
         )
 
 try:
+    # 获取有效的统计文件
+    valid_stats_files = []
+    for stats_file, status_file in zip(snakemake.input.stats, snakemake.input.status):
+        with open(status_file, 'r') as f:
+            status = f.read().strip()
+        if status == 'valid':
+            valid_stats_files.append(stats_file)
+            logging.info(f"Including stats file: {stats_file}")
+        else:
+            logging.info(f"Skipping empty bin stats: {stats_file}")
 
-    pandas_concat(snakemake.input, snakemake.output[0])
+    # 处理统计文件
+    if not valid_stats_files:
+        empty_stats = pd.DataFrame(columns=[
+            "File", "Length", "N_scaffolds", "N50",
+            "Length_contigs", "N_contigs", "Ambigious_bases"
+        ])
+        empty_stats.to_csv(snakemake.output[0], sep="\t", index=False)
+        logging.info("No valid bins found, created empty combined stats file")
+    else:
+        pandas_concat(valid_stats_files, snakemake.output[0])
+        logging.info(f"Successfully combined {len(valid_stats_files)} stats files")
 
 except Exception as e:
-    import traceback
-
-    with open(snakemake.log[0], "w") as logfile:
-        traceback.print_exc(file=logfile)
-
-    raise e
+    logging.error(f"Error: {str(e)}")
+    raise

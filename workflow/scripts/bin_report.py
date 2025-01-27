@@ -51,6 +51,9 @@ def make_plots(bin_info):
     bin2species = pd.read_table(snakemake.input.bins2species, index_col=0)
     df = df.join(bin2species)
 
+    df['Species'] = df['Species'].fillna('Unknown')
+    df['Representative'] = df['Representative'].fillna(False)
+
     logging.info(df.head())
 
     logging.info(bin2species.head())

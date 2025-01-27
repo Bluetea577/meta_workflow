@@ -9,6 +9,8 @@ rule calculate_contig_coverage:
         bai=ASSE_RUN + "/megahit/{sra_run}/sequence_alignment/{sra_run}_sort.bam.bai",
     output:
         coverage=BIN_RUN + "/contigs_coverage/{sra_run}_contig_coverage.tsv",
+    params:
+        tmp=ASSE_RUN + "/megahit/{sra_run}/contig_reads.tmp"
     conda:
         "../envs/align.yaml"
     benchmark:
@@ -25,14 +27,14 @@ rule calculate_contig_coverage:
         mapped_reads=$(samtools view -F 0x4 -c {input.bam})  
 
         # 先获取每个contig的实际reads数  
-        samtools idxstats {input.bam} | cut -f 1,3 > contig_reads.tmp  
+        samtools idxstats {input.bam} | cut -f 1,3 > {params.tmp}  
 
         # 然后计算深度  
         samtools depth -a {input.bam} | \
         awk -v total="$total_reads" -v mapped="$mapped_reads" '  
         BEGIN {{  
             # 读取每个contig的实际reads数  
-            while(getline < "contig_reads.tmp") {{  
+            while(getline < "{params.tmp}") {{  
                 contig_reads[$1] = $2  
             }}  
             print "contig\tlength\tcoverage\treads\tTPM\trel_abundance"  
@@ -87,7 +89,7 @@ rule calculate_contig_coverage:
             printf "Average coverage: %.2f\\n", (rpk_sum/length(depth)) > "/dev/stderr"  
         }}' > {output.coverage} 2> {log}  
 
-        rm contig_reads.tmp  
+        rm {params.tmp}  
         """
 
 rule calculate_bin_abundance:
@@ -95,6 +97,7 @@ rule calculate_bin_abundance:
     input:
         coverage=BIN_RUN + "/contigs_coverage/{sra_run}_contig_coverage.tsv",
         contig2bin=BIN_RUN + "/metabat/{sra_run}/cluster_attribution.tsv",
+        status=BIN_RUN + "/metabat/{sra_run}/bin_status",
     output:
         abundance=BIN_RUN + "/bin_abundances/{sra_run}_bin_abundance.tsv",
     threads: 2
@@ -102,6 +105,15 @@ rule calculate_bin_abundance:
         mem_mb=3500 * 2
     run:
         import pandas as pd
+
+        with open(input.status) as f:
+            status = f.read().strip()
+
+        if status == 'empty':
+            # 如果是空样本，创建空的输出文件
+            pd.DataFrame(columns=['bin', 'length', 'coverage', 'reads', 'TPM', 'rel_abundance']) \
+                .to_csv(output.abundance,sep='\t',index=False)
+            return
 
         # 读取contig统计量
         coverage_df = pd.read_csv(input.coverage, sep='\t')
@@ -165,6 +177,8 @@ rule combine_bin_abundances:
     input:
         abundances=expand(BIN_RUN + "/bin_abundances/{sra_run}_bin_abundance.tsv",
             sra_run=IDS),
+        status_files=expand(BIN_RUN + "/metabat/{sra_run}/bin_status",
+            sra_run=IDS),
     output:
         matrix=BIN_RUN + "/bin_abundances/bin_abundance_matrix.tsv",
         summary=BIN_RUN + "/bin_abundances/bin_abundance_summary.tsv",# 添加一个汇总文件
@@ -179,29 +193,39 @@ rule combine_bin_abundances:
         abundance_dfs = []  # 用于存储相对丰度
         summary_dfs = []  # 用于存储完整统计信息
 
-        for file in input.abundances:
-            sample = Path(file).stem.replace('_bin_abundance','')
-            df = pd.read_csv(file,sep='\t')
+        for file,status_file in zip(input.abundances, input.status_files):
+            with open(status_file) as f:
+                status = f.read().strip()
 
-            # 为汇总文件准备数据
-            summary_df = df.copy()
-            summary_df['sample'] = sample
-            summary_dfs.append(summary_df)
+            if status == 'valid':
+                sample = Path(file).stem.replace('_bin_abundance','')
+                df = pd.read_csv(file,sep='\t')
 
-            # 为丰度矩阵准备数据
-            abundance_df = df[['bin', 'rel_abundance']].copy()
-            abundance_df = abundance_df.rename(columns={'rel_abundance': sample})
-            abundance_df = abundance_df.set_index('bin')
-            abundance_dfs.append(abundance_df)
+                # 为汇总文件准备数据
+                summary_df = df.copy()
+                summary_df['sample'] = sample
+                summary_dfs.append(summary_df)
 
-        # 创建丰度矩阵
-        abundance_matrix = pd.concat(abundance_dfs,axis=1)
-        abundance_matrix = abundance_matrix.fillna(0)  # 填充缺失值为0
+                # 为丰度矩阵准备数据
+                abundance_df = df[['bin', 'rel_abundance']].copy()
+                abundance_df = abundance_df.rename(columns={'rel_abundance': sample})
+                abundance_df = abundance_df.set_index('bin')
+                abundance_dfs.append(abundance_df)
 
-        # 创建汇总表
-        summary_matrix = pd.concat(summary_dfs,ignore_index=True)
-        summary_matrix = summary_matrix.sort_values(['sample', 'rel_abundance'],
-            ascending=[True, False])
+        if abundance_dfs:
+            # 创建丰度矩阵
+            abundance_matrix = pd.concat(abundance_dfs,axis=1)
+            abundance_matrix = abundance_matrix.fillna(0)  # 填充缺失值为0
+
+            # 创建汇总表
+            summary_matrix = pd.concat(summary_dfs,ignore_index=True)
+            summary_matrix = summary_matrix.sort_values(['sample', 'rel_abundance'],
+                ascending=[True, False])
+        else:
+            # 创建空的输出文件
+            abundance_matrix = pd.DataFrame()
+            summary_matrix = pd.DataFrame(columns=['bin', 'length', 'coverage', 'reads', 'TPM', 'rel_abundance',
+                                                   'sample'])
 
         # 保存结果
         abundance_matrix.to_csv(output.matrix,sep='\t')

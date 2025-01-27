@@ -35,157 +35,68 @@ sys.excepthook = handle_exception
 
 #### Begining of scripts
 
-def _pandas_concat_in_memory(
-    input_tables,
-    output_table,
-    sep,
-    index_col,
-    axis,
-    read_arguments,
-    save_arguments,
-    concat_arguments,
-):
-    import pandas as pd
+import pandas as pd
 
-    Tables = [
-        pd.read_csv(file, index_col=index_col, sep=sep, **read_arguments)
-        for file in input_tables
-    ]
-
-    out = pd.concat(Tables, axis=axis, **concat_arguments).sort_index()
-
-    del Tables
-
-    out.to_csv(output_table, sep=sep, **save_arguments)
-
-
-def _pandas_concat_disck_based(
-    input_tables,
-    output_table,
-    sep,
-    index_col,
-    read_arguments,
-    save_arguments,
-    selected_headers=None,
-):
-    """combine different tables but one after the other in disk based"""
-
-    import pandas as pd
-
+def read_gunc_report(file_path):
+    """读取单个GUNC报告文件,处理空bins的情况"""
     try:
-        from tqdm import tqdm
-    except ImportError:
-        tqdm = tuple
+        df = pd.read_csv(file_path, sep='\t')
 
-    if selected_headers is not None:
+        # 检查是否为空bins的输出
+        if (df.shape[0] == 1 and
+                'genome' in df.columns and
+                df['genome'].iloc[0].endswith('_metabat_1')):
+            return df
+
+        return df
+
+    except Exception as e:
+        logging.error(f"Error reading file {file_path}: {str(e)}")
+        # 返回空DataFrame
+        return pd.DataFrame()
+
+
+def combine_gunc_reports(gunc_files, status_files, samples, output_file):
+    """合并所有GUNC报告"""
+    df_list = []
+
+    for sample, gunc_file, status_file in zip(samples,gunc_files, status_files):
         try:
-            selected_headers = list(selected_headers)
+            with open(status_file, 'r') as f:
+                status = f.read().strip()
+
+            if status == 'valid':
+                df = pd.read_csv(gunc_file,sep='\t')
+                df_list.append(df)
+                logging.info(f"Including GUNC data for sample {sample}")
+            else:
+                logging.info(f"Skipping sample {sample} (status: {status})")
         except Exception as e:
-            raise Exception("selected_headers should be a list-like") from e
+            logging.error(f"Failed processing sample {sample}: {str(e)}")
+            continue
 
+    if df_list:
+        # 合并所有数据
+        combined_df = pd.concat(df_list, axis=0, ignore_index=True)
+        # 保存结果
+        combined_df.to_csv(output_file, sep='\t', index=False)
+        logging.info(f"Successfully combined {len(df_list)} reports")
     else:
-        # read all_headers
-        selected_headers = set()
-        for file in input_tables:
-            headers_of_file = pd.read_csv(
-                file, index_col=index_col, sep=sep, nrows=2, dtype=str, **read_arguments
-            )
+        # 如果没有有效数据,创建空的输出文件
+        pd.DataFrame(columns=['genome', 'pass.GUNC', 'warning']) \
+            .to_csv(output_file, sep='\t', index=False)
+        logging.warning("No valid data to combine")
 
-            selected_headers.update(list(headers_of_file.columns))
-
-        selected_headers = list(selected_headers)
-        logger.info(f"Inferred following list of headers {selected_headers}")
-
-    # parse one file after another
-
-    logger.info("Read an append table by table")
-    for file in tqdm(input_tables):
-        # read full table
-        table = pd.read_csv(
-            file, index_col=index_col, sep=sep, dtype=str, **read_arguments
-        )
-        # set to common header
-        table = table.reindex(selected_headers, axis=1)
-
-        if file == input_tables[0]:
-            mode = "w"
-            print_header = True
-        else:
-            mode = "a"
-            print_header = False
-
-        table.to_csv(
-            output_table, sep=sep, mode=mode, header=print_header, **save_arguments
-        )
-
-
-def pandas_concat(
-    input_tables,
-    output_table,
-    sep="\t",
-    index_col=0,
-    axis=0,
-    read_arguments=None,
-    save_arguments=None,
-    concat_arguments=None,
-    disk_based=False,
-    selected_headers=None,  # only used in disk based, not passed to usecols
-):
-    """
-    Uses pandas to read,concatenate and save tables using pandas.concat
-    """
-
-    if read_arguments is None:
-        read_arguments = {}
-    if save_arguments is None:
-        save_arguments = {}
-
-    if type(input_tables) == str:
-        input_tables = [input_tables]
-
-    common_arrguments = dict(
-        input_tables=input_tables,
-        output_table=output_table,
-        sep=sep,
-        index_col=index_col,
-        read_arguments=read_arguments,
-        save_arguments=save_arguments,
-    )
-
-    if disk_based:
-        if concat_arguments is not None:
-            raise Exception(
-                f"cannot hanndle concat arguments by disck based append, got {concat_arguments}"
-            )
-
-        assert axis == 0, "Can only append on axis= 0"
-
-        _pandas_concat_disck_based(
-            selected_headers=selected_headers, **common_arrguments
-        )
-
-    else:
-        # in memory concat
-        if concat_arguments is None:
-            concat_arguments = {}
-
-        if selected_headers is not None:
-            raise Exception(
-                "argument 'selected_headers' is not used in 'in memory' concat. Use read_arguments=dict(usecols=selected_headers) instead "
-            )
-
-        _pandas_concat_in_memory(
-            axis=axis, concat_arguments=concat_arguments, **common_arrguments
-        )
 
 if __name__ == "__main__":
     try:
-        pandas_concat(snakemake.input, snakemake.output[0])
-
+        combine_gunc_reports(
+            gunc_files=snakemake.input.gunc_files,
+            status_files=snakemake.input.status_files,
+            samples=snakemake.params.samples,
+            output_file=snakemake.output.bin_table
+        )
     except Exception as e:
-        import traceback
-
-        with open(snakemake.log[0], "w") as logfile:
-            traceback.print_exc(file=logfile)
-
+        logging.error(f"Script failed: {str(e)}")
+        traceback.print_exc(file=sys.stderr)
         raise e

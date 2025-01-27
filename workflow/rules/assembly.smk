@@ -65,7 +65,7 @@ rule rename_megahit_output:
     input:
         ASSE_RUN + "/megahit/{sra_run}/{sra_run}_prefilter.contigs.fa",
     output:
-        temp(ASSE_RUN + "/megahit/{sra_run}/{sra_run}_raw_contigs.fasta"),
+        ASSE_RUN + "/megahit/{sra_run}/{sra_run}_raw_contigs.fasta",
     shell:
         "cp {input} {output}"
 
@@ -342,6 +342,7 @@ localrules:
 
 rule upload_assembly:
     input:
+        raw_contigs = ASSE_RUN + "/megahit/{sra_run}/{sra_run}_raw_contigs.fasta",
         contigs = ASSE_RUN + "/megahit/{sra_run}/{sra_run}_final_contigs.fasta",
         stats = ASSE_RUN + "/megahit/{sra_run}/final_contig_stats.txt",
         mapping = ASSE_RUN + "/megahit/{sra_run}/old2new_contig_names.tsv",
@@ -379,6 +380,7 @@ rule upload_assembly:
         bypy mkdir {params.remote_dir}/predicted_genes 2>> {log}
 
         # 上传文件
+        bypy upload {input.raw_contigs} {params.remote_dir}/ 2>> {log}
         bypy upload {input.contigs} {params.remote_dir}/ 2>> {log}
         bypy upload {input.stats} {params.remote_dir}/ 2>> {log}
         bypy upload {input.mapping} {params.remote_dir}/ 2>> {log}
@@ -393,13 +395,12 @@ rule upload_assembly:
             bypy upload "$f" {params.remote_dir}/predicted_genes/ 2>> {log}
         done
         
-        rm -rf {params.clean_dir}/*.fastq.gz 2>> {log}
-        rm -rf {params.pred_dir}/*.faa 2>> {log}
-        rm -rf {params.pred_dir}/*.fna 2>> {log}
-        rm -rf {params.pred_dir}/*.gff 2>> {log}
-        rm -rf {params.assem_dir}/{wildcards.sra_run}_prefilter.contigs.fa 2>> {log}
-        rm -rf {params.assem_dir}/{wildcards.sra_run}_prefilter_contigs.fasta 2>> {log}
-        rm -rf {params.assem_dir}/{wildcards.sra_run}_raw_contigs.fasta 2>> {log}
+        # rm -rf {params.clean_dir}/*.fastq.gz 2>> {log}
+        # rm -rf {params.pred_dir}/*.faa 2>> {log}
+        # rm -rf {params.pred_dir}/*.fna 2>> {log}
+        # rm -rf {params.pred_dir}/*.gff 2>> {log}
+        # rm -rf {params.assem_dir}/{wildcards.sra_run}_prefilter.contigs.fa 2>> {log}
+        # rm -rf {params.assem_dir}/{wildcards.sra_run}_prefilter_contigs.fasta 2>> {log}
         """
 
 rule upload_assembly_report:
@@ -409,7 +410,7 @@ rule upload_assembly_report:
         stats_done = WORKDIR + "stats/.combined_stats.done",
         report_done = WORKDIR + "reports/.assembly_report.done"
     output:
-        mark = touch(WORKDIR + ".assembly_report_upload.done")
+        mark = touch(ASSE_RUN + "/.assembly_report_upload.done")
     params:
         remote_dir = "assembly/report"
     conda:
@@ -428,6 +429,6 @@ rule finish_assembly:
     input:
         report_done = WORKDIR + "reports/.assembly_report.done",
         upload_done = expand(ASSE_RUN + "/megahit/{sra_run}/.{sra_run}.upload.done", sra_run=IDS),
-        report_upload_done = WORKDIR + ".assembly_report_upload.done"
+        report_upload_done = ASSE_RUN + "/.assembly_report_upload.done"
     output:
         touch(ASSE_RUN + "/rule_assembly.done")

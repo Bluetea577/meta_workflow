@@ -120,5 +120,18 @@ def get_many_genome_stats(filenames, output_filename, threads=1):
     stats.to_csv(output_filename, sep="\t", index=False)
 
 
-filenames = list(Path(snakemake.input[0]).glob("*" + snakemake.params.extension))
-get_many_genome_stats(filenames, snakemake.output[0], snakemake.threads)
+with open(snakemake.input.status, 'r') as f:
+    status = f.read().strip()
+
+if status == 'empty':
+    # 如果是空bins，创建空的统计文件
+    empty_stats = pd.DataFrame(columns=[
+        "File", "Length_scaffolds", "N_scaffolds", "N50",
+        "Length_contigs", "N_contigs", "Ambigious_bases"
+    ])
+    empty_stats.to_csv(snakemake.output[0], sep="\t", index=False)
+    logging.info("Empty bin detected, created empty stats file")
+else:
+    # 处理正常的bins
+    filenames = list(Path(snakemake.input.bin_dir).glob("*" + snakemake.params.extension))
+    get_many_genome_stats(filenames, snakemake.output[0], snakemake.threads)

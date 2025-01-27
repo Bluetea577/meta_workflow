@@ -41,19 +41,33 @@ import pandas as pd
 from Bio import SeqIO
 
 
-def get_fasta_of_bins(cluster_attribution, contigs_file, out_folder):
+def get_fasta_of_bins(cluster_attribution, contigs_file, out_folder, status_file):
     """
     Creates individual fasta files for each bin using the contigs fasta and the cluster attribution.
 
     input:
     - cluster attribution file:   tab seperated file of "contig_fasta_header    bin"
     - contigs:                    fasta file of contigs
-    - out_prefix:                 output_prefix for bin fastas  {out_folder}/{binid}.fasta
+    - out_folder:                 output folder for bin fastas {out_folder}/{binid}.fasta
+    - status_file:                file containing bin status ('empty' or 'valid')
     """
+    # Check bin status first
+    with open(status_file, 'r') as f:
+        status = f.read().strip()
+
     # create outdir
     if os.path.exists(out_folder):
         shutil.rmtree(out_folder)
     os.makedirs(out_folder)
+
+    if status == 'empty':
+        logging.info("Empty bins detected, creating placeholder bin")
+        # Create placeholder bin
+        # sample_name = os.path.basename(cluster_attribution).split('_')[0]  # 从文件路径获取样本名
+        # placeholder_file = os.path.join(out_folder, f"{sample_name}_metabat_1.fasta")
+        # with open(placeholder_file, 'w') as f:
+        #     f.write(">placeholder\nN\n")
+        return
 
     CA = pd.read_csv(cluster_attribution, header=None, sep="\t", dtype=str)
 
@@ -98,4 +112,5 @@ if __name__ == "__main__":
         snakemake.input.cluster_attribution,
         snakemake.input.contigs,
         snakemake.output[0],
+        snakemake.input.status,
     )
