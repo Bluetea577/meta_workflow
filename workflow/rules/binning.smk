@@ -367,81 +367,118 @@ localrules:
     upload_bin_report,
     finish_binning,
 
-rule upload_bins:
-    input:
-        bin_dir = BIN_RUN + "/metabat/{sra_run}/bin",
-        checkm2_report = BIN_RUN + "/metabat/{sra_run}/checkm2_report.tsv",
-        gunc_report = BIN_RUN + "/metabat/{sra_run}/gunc_report.tsv" if config.get("filter_chimieric_bins", False) else [],
-        genome_stats = BIN_RUN + "/metabat/{sra_run}/genome_stats.tsv",
-        cluster_attribution = BIN_RUN + "/metabat/{sra_run}/cluster_attribution.tsv",
-        faa_dir = BIN_RUN + "/metabat/{sra_run}/faa",
-        status= BIN_RUN + "/metabat/{sra_run}/bin_status",
-    output:
-        mark=touch(BIN_RUN + "/metabat/{sra_run}/.{sra_run}.upload.done"),
-    params:
-        remote_dir=config.get("upload_tag", "") + "binning/{sra_run}"
-    conda:
-        "../envs/baiduyun.yaml"
-    log:
-        "logs/binning/upload/{sra_run}.log"
-    shell:
-        """  
-        bypy mkdir {params.remote_dir} 2>> {log}
-        bypy mkdir {params.remote_dir}/bin 2>> {log}
-        bypy mkdir {params.remote_dir}/faa 2>> {log}
+if config.get("upload", False):
+    rule upload_bins:
+        input:
+            bin_dir=BIN_RUN + "/metabat/{sra_run}/bin",
+            checkm2_report=BIN_RUN + "/metabat/{sra_run}/checkm2_report.tsv",
+            gunc_report=BIN_RUN + "/metabat/{sra_run}/gunc_report.tsv" if config.get("filter_chimieric_bins",False) else [],
+            genome_stats=BIN_RUN + "/metabat/{sra_run}/genome_stats.tsv",
+            cluster_attribution=BIN_RUN + "/metabat/{sra_run}/cluster_attribution.tsv",
+            faa_dir=BIN_RUN + "/metabat/{sra_run}/faa",
+            status=BIN_RUN + "/metabat/{sra_run}/bin_status",
+        output:
+            mark=touch(BIN_RUN + "/metabat/{sra_run}/.{sra_run}.upload.done"),
+        params:
+            remote_dir=config.get("upload_tag","") + "binning/{sra_run}",
+            config_dir=lambda wildcards: f"/tmp/bypy_bins_{wildcards.sra_run}"
+        conda:
+            "../envs/baiduyun.yaml"
+        resources:
+            upload_slots=1,
+        log:
+            "logs/binning/upload/{sra_run}.log"
+        shell:
+            """  
+            mkdir -p {params.config_dir}  
+            cp ~/.bypy/bypy.json {params.config_dir}/  
     
-        bypy upload {input.bin_dir}/ {params.remote_dir}/bin/ 2>> {log} 
-        bypy upload {input.faa_dir}/ {params.remote_dir}/faa/ 2>> {log}
-        bypy upload {input.checkm2_report} {params.remote_dir}/ 2>> {log}
-        bypy upload {input.genome_stats} {params.remote_dir}/ 2>> {log}
-        bypy upload {input.cluster_attribution} {params.remote_dir}/ 2>> {log}
-        bypy upload {input.status} {params.remote_dir}/ 2>> {log}
-        
-        if [ -f "{input.gunc_report}" ]; then  
-            bypy upload {input.gunc_report} {params.remote_dir}/ 2>> {log}  
-        fi
-        """
+            bypy --config-dir {params.config_dir} mkdir {params.remote_dir} 2>> {log}  
+            bypy --config-dir {params.config_dir} mkdir {params.remote_dir}/bin 2>> {log}  
+            bypy --config-dir {params.config_dir} mkdir {params.remote_dir}/faa 2>> {log}  
+    
+            bypy --config-dir {params.config_dir} upload {input.bin_dir}/ {params.remote_dir}/bin/ 2>> {log}   
+            bypy --config-dir {params.config_dir} upload {input.faa_dir}/ {params.remote_dir}/faa/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.checkm2_report} {params.remote_dir}/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.genome_stats} {params.remote_dir}/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.cluster_attribution} {params.remote_dir}/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.status} {params.remote_dir}/ 2>> {log}  
+    
+            if [ -f "{input.gunc_report}" ]; then  
+                bypy --config-dir {params.config_dir} upload {input.gunc_report} {params.remote_dir}/ 2>> {log}  
+            fi  
+    
+            rm -rf {params.config_dir}  
+            """
 
-rule upload_bin_report:
-    input:
-        bins_paths=BIN_RUN + "/metabat/bins_paths.tsv",
-        checkm2_report=BIN_RUN + "/metabat/checkm2_quality_report.tsv",
-        gunc_report=BIN_RUN + "/metabat/gunc_quality_report.tsv" if config.get("filter_chimieric_bins", False) else [],
-        genome_stats=BIN_RUN + "/metabat/genome_stats.tsv",
-        contigs2bins=BIN_RUN + "/metabat/contigs2bins.tsv.gz",
-        filtered_info=BIN_RUN + "/metabat/filtered/filtered_bins_info.tsv",
-        filtered_paths=BIN_RUN + "/metabat/filtered/filtered_bins_paths.txt"
-    output:
-        mark=touch(BIN_RUN + "/.bin_report_upload.done")
-    params:
-        remote_dir=config.get("upload_tag", "") + "binning/report",
-    conda:
-        "../envs/baiduyun.yaml"
-    log:
-        "logs/binning/upload_report.log"
-    shell:
-        """  
-        bypy mkdir {params.remote_dir} 2>> {log}
-        bypy mkdir {params.remote_dir}/filtered 2>> {log}
+    rule upload_bin_report:
+        input:
+            bins_paths=BIN_RUN + "/metabat/bins_paths.tsv",
+            checkm2_report=BIN_RUN + "/metabat/checkm2_quality_report.tsv",
+            gunc_report=BIN_RUN + "/metabat/gunc_quality_report.tsv" if config.get("filter_chimieric_bins",False) else [],
+            genome_stats=BIN_RUN + "/metabat/genome_stats.tsv",
+            contigs2bins=BIN_RUN + "/metabat/contigs2bins.tsv.gz",
+            filtered_info=BIN_RUN + "/metabat/filtered/filtered_bins_info.tsv",
+            filtered_paths=BIN_RUN + "/metabat/filtered/filtered_bins_paths.txt"
+        output:
+            mark=touch(BIN_RUN + "/.bin_report_upload.done")
+        params:
+            remote_dir=config.get("upload_tag","") + "binning/report",
+            config_dir="/tmp/bypy_bins_report"
+        conda:
+            "../envs/baiduyun.yaml"
+        resources:
+            upload_slots=1,
+        log:
+            "logs/binning/upload_report.log"
+        shell:
+            """  
+            mkdir -p {params.config_dir}  
+            cp ~/.bypy/bypy.json {params.config_dir}/  
+    
+            bypy --config-dir {params.config_dir} mkdir {params.remote_dir} 2>> {log}  
+            bypy --config-dir {params.config_dir} mkdir {params.remote_dir}/filtered 2>> {log}  
+    
+            bypy --config-dir {params.config_dir} upload {input.bins_paths} {params.remote_dir}/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.checkm2_report} {params.remote_dir}/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.genome_stats} {params.remote_dir}/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.contigs2bins} {params.remote_dir}/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.filtered_info} {params.remote_dir}/filtered/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.filtered_paths} {params.remote_dir}/filtered/ 2>> {log}  
+    
+            if [ -f "{input.gunc_report}" ]; then  
+                bypy --config-dir {params.config_dir} upload {input.gunc_report} {params.remote_dir}/ 2>> {log}  
+            fi  
+    
+            rm -rf {params.config_dir}  
+            """
 
-        bypy upload {input.bins_paths} {params.remote_dir}/ 2>> {log}
-        bypy upload {input.checkm2_report} {params.remote_dir}/ 2>> {log}
-        bypy upload {input.genome_stats} {params.remote_dir}/ 2>> {log}
-        bypy upload {input.contigs2bins} {params.remote_dir}/ 2>> {log}
-        bypy upload {input.filtered_info} {params.remote_dir}/filtered/ 2>> {log}
-        bypy upload {input.filtered_paths} {params.remote_dir}/filtered/ 2>> {log}
-        
-        if [ -f "{input.gunc_report}" ]; then  
-            bypy upload {input.gunc_report} {params.remote_dir}/ 2>> {log}  
-        fi
-        """
+    rule finish_binning_with_upload:
+        input:
+            upload_done=expand(BIN_RUN + "/metabat/{sra_run}/.{sra_run}.upload.done",sra_run=IDS),
+            report_upload_done=BIN_RUN + "/.bin_report_upload.done"
+        output:
+            touch(BIN_RUN + "/rule_binning.done")
+else:
+    rule finish_binning:
+        input:
+            bin_dir = expand(BIN_RUN + "/metabat/{sra_run}/bin", sra_run=IDS),
+            checkm2_report = expand(BIN_RUN + "/metabat/{sra_run}/checkm2_report.tsv", sra_run=IDS),
+            gunc_report = expand(BIN_RUN + "/metabat/{sra_run}/gunc_report.tsv", sra_run=IDS) if config.get("filter_chimieric_bins",False) else [],
+            genome_stats = expand(BIN_RUN + "/metabat/{sra_run}/genome_stats.tsv", sra_run=IDS),
+            cluster_attribution = expand(BIN_RUN + "/metabat/{sra_run}/cluster_attribution.tsv", sra_run=IDS),
+            faa_dir = expand(BIN_RUN + "/metabat/{sra_run}/faa", sra_run=IDS),
+            status = expand(BIN_RUN + "/metabat/{sra_run}/bin_status", sra_run=IDS),
+            bins_paths=BIN_RUN + "/metabat/bins_paths.tsv",
+            checkm2_reports=BIN_RUN + "/metabat/checkm2_quality_report.tsv",
+            gunc_reports=BIN_RUN + "/metabat/gunc_quality_report.tsv" if config.get("filter_chimieric_bins",False) else [],
+            genome_statses=BIN_RUN + "/metabat/genome_stats.tsv",
+            contigs2bins=BIN_RUN + "/metabat/contigs2bins.tsv.gz",
+            filtered_info=BIN_RUN + "/metabat/filtered/filtered_bins_info.tsv",
+            filtered_paths=BIN_RUN + "/metabat/filtered/filtered_bins_paths.txt",
+        output:
+            touch(BIN_RUN + "/rule_binning.done")
 
-rule finish_binning:
-    input:
-        upload_done=expand(BIN_RUN + "/metabat/{sra_run}/.{sra_run}.upload.done",sra_run=IDS),
-        report_upload_done=BIN_RUN + "/.bin_report_upload.done"
-    output:
-        touch(BIN_RUN + "/rule_binning.done")
 
 # rule build_bin_report:
 #     input:

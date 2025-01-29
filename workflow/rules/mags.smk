@@ -325,51 +325,74 @@ localrules:
     upload_abundances,
     finish_mags,
 
-rule upload_abundances:
-    """上传所有统计结果"""
-    input:
-        contig_coverage=expand(BIN_RUN + "/contigs_coverage/{sra_run}_contig_coverage.tsv",
-            sra_run=IDS),
-        bin_abundance=expand(BIN_RUN + "/bin_abundances/{sra_run}_bin_abundance.tsv",
-            sra_run=IDS),
-        bin_matrix=BIN_RUN + "/bin_abundances/bin_abundance_matrix.tsv",  # 改名以避免重复
-        species_coverage=BIN_RUN + "/bin_abundances/species_coverage_matrix.tsv",
-        species_abundance=BIN_RUN + "/bin_abundances/species_relative_abundance_matrix.tsv",
-        species_tpm=BIN_RUN + "/bin_abundances/species_tpm_matrix.tsv"
-    output:
-        mark=touch(BIN_RUN + "/.abundance_upload.done")
-    params:
-        remote_dir=config.get("upload_tag", "") + "binning/abundance"
-    conda:
-        "../envs/baiduyun.yaml"
-    log:
-        "logs/binning/upload/abundance.log"
-    shell:
-        """  
-        # 创建远程目录结构  
-        bypy mkdir {params.remote_dir} 2>> {log}  
-        bypy mkdir {params.remote_dir}/contigs_coverage 2>> {log}  
-        bypy mkdir {params.remote_dir}/bin_abundances 2>> {log}  
+if config.get("upload", False):
+    rule upload_abundances:
+        """上传所有统计结果"""
+        input:
+            contig_coverage=expand(BIN_RUN + "/contigs_coverage/{sra_run}_contig_coverage.tsv",
+                sra_run=IDS),
+            bin_abundance=expand(BIN_RUN + "/bin_abundances/{sra_run}_bin_abundance.tsv",
+                sra_run=IDS),
+            bin_matrix=BIN_RUN + "/bin_abundances/bin_abundance_matrix.tsv",# 改名以避免重复
+            species_coverage=BIN_RUN + "/bin_abundances/species_coverage_matrix.tsv",
+            species_abundance=BIN_RUN + "/bin_abundances/species_relative_abundance_matrix.tsv",
+            species_tpm=BIN_RUN + "/bin_abundances/species_tpm_matrix.tsv"
+        output:
+            mark=touch(BIN_RUN + "/.abundance_upload.done")
+        params:
+            remote_dir=config.get("upload_tag","") + "binning/abundance",
+            config_dir="/tmp/bypy_abundances"
+        conda:
+            "../envs/baiduyun.yaml"
+        resources:
+            upload_slots=1,
+        log:
+            "logs/binning/upload/abundance.log"
+        shell:
+            """  
+            mkdir -p {params.config_dir}  
+            cp ~/.bypy/bypy.json {params.config_dir}/  
+    
+            # 创建远程目录结构  
+            bypy --config-dir {params.config_dir} mkdir {params.remote_dir} 2>> {log}  
+            bypy --config-dir {params.config_dir} mkdir {params.remote_dir}/contigs_coverage 2>> {log}  
+            bypy --config-dir {params.config_dir} mkdir {params.remote_dir}/bin_abundances 2>> {log}  
+    
+            # 上传contig覆盖度文件  
+            for f in {input.contig_coverage}; do  
+                bypy --config-dir {params.config_dir} upload "$f" {params.remote_dir}/contigs_coverage/ 2>> {log}  
+            done  
+    
+            # 上传bin丰度文件  
+            for f in {input.bin_abundance}; do  
+                bypy --config-dir {params.config_dir} upload "$f" {params.remote_dir}/bin_abundances/ 2>> {log}  
+            done  
+    
+            # 上传矩阵文件  
+            bypy --config-dir {params.config_dir} upload {input.bin_matrix} {params.remote_dir}/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.species_coverage} {params.remote_dir}/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.species_abundance} {params.remote_dir}/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.species_tpm} {params.remote_dir}/ 2>> {log}  
+    
+            rm -rf {params.config_dir}  
+            """
 
-        # 上传contig覆盖度文件  
-        for f in {input.contig_coverage}; do  
-            bypy upload "$f" {params.remote_dir}/contigs_coverage/ 2>> {log}  
-        done  
+    rule finish_mags_with_upload:
+        input:
+            abundance_upload=BIN_RUN + "/.abundance_upload.done"
+        output:
+            touch(BIN_RUN + "/rule_mags.done")
 
-        # 上传bin丰度文件  
-        for f in {input.bin_abundance}; do  
-            bypy upload "$f" {params.remote_dir}/bin_abundances/ 2>> {log}  
-        done  
-
-        # 上传矩阵文件  
-        bypy upload {input.bin_matrix} {params.remote_dir}/ 2>> {log}  
-        bypy upload {input.species_coverage} {params.remote_dir}/ 2>> {log}  
-        bypy upload {input.species_abundance} {params.remote_dir}/ 2>> {log}  
-        bypy upload {input.species_tpm} {params.remote_dir}/ 2>> {log}  
-        """
-
-rule finish_mags:
-    input:
-        abundance_upload=BIN_RUN + "/.abundance_upload.done"
-    output:
-        touch(BIN_RUN + "/rule_mags.done")
+else:
+    rule finish_mags:
+        input:
+            contig_coverage=expand(BIN_RUN + "/contigs_coverage/{sra_run}_contig_coverage.tsv",
+                sra_run=IDS),
+            bin_abundance = expand(BIN_RUN + "/bin_abundances/{sra_run}_bin_abundance.tsv",
+                sra_run=IDS),
+            bin_matrix = BIN_RUN + "/bin_abundances/bin_abundance_matrix.tsv",  # 改名以避免重复
+            species_coverage = BIN_RUN + "/bin_abundances/species_coverage_matrix.tsv",
+            species_abundance = BIN_RUN + "/bin_abundances/species_relative_abundance_matrix.tsv",
+            species_tpm = BIN_RUN + "/bin_abundances/species_tpm_matrix.tsv"
+        output:
+            touch(BIN_RUN + "/rule_mags.done")

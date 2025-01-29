@@ -15,6 +15,7 @@ This Snakemake workflow is designed for processing metagenomic sequencing data, 
 	-	dbs.human
 	-	database_dir
 	-	host
+	-	upload
 	-	upload_tag
 	-	kneaddata_opt.trimmomatic
 	-	megahit_set
@@ -22,3 +23,10 @@ This Snakemake workflow is designed for processing metagenomic sequencing data, 
 	-	filter_chimieric_bins
 2. modify Snakefile to chose some rules
 3. confirm some remove rules
+
+RUN：
+
+```bash
+snakemake --executor slurm --use-conda --default-resources slurm_account=<SLURM ACCOUNT> slurm_partition=<SLURM PARTITION> -j <TASK COUNT> --resources download_slots=<NUM> upload_slots=<NUM>
+```
+

@@ -202,49 +202,75 @@ localrules:
     upload_drep_report,
     finish_drep,
 
-rule upload_drep:
-    input:
-        workdir=BIN_RUN + "/derep/workdir",
-        bin_info=BIN_RUN + "/derep/bin_info.tsv",
-        bins2species=BIN_RUN + "/derep/bins2species.tsv",
-    output:
-        mark=touch(BIN_RUN + "/derep/.drep.upload.done")
-    params:
-        remote_dir=config.get("upload_tag", "") + "binning/derep"
-    conda:
-        "../envs/baiduyun.yaml"
-    log:
-        "logs/binning/upload/drep.log"
-    shell:
-        """
-        bypy mkdir {params.remote_dir} 2>> {log} 
-        bypy mkdir {params.remote_dir}/workdir 2>> {log}
+if config.get("upload", False):
+    rule upload_drep:
+        input:
+            workdir=BIN_RUN + "/derep/workdir",
+            bin_info=BIN_RUN + "/derep/bin_info.tsv",
+            bins2species=BIN_RUN + "/derep/bins2species.tsv",
+        output:
+            mark=touch(BIN_RUN + "/derep/.drep.upload.done")
+        params:
+            remote_dir=config.get("upload_tag","") + "binning/derep",
+            config_dir="/tmp/bypy_drep"
+        conda:
+            "../envs/baiduyun.yaml"
+        resources:
+            upload_slots=1,
+        log:
+            "logs/binning/upload/drep.log"
+        shell:
+            """  
+            mkdir -p {params.config_dir}  
+            cp ~/.bypy/bypy.json {params.config_dir}/  
+    
+            bypy --config-dir {params.config_dir} mkdir {params.remote_dir} 2>> {log}   
+            bypy --config-dir {params.config_dir} mkdir {params.remote_dir}/workdir 2>> {log}  
+    
+            bypy --config-dir {params.config_dir} upload {input.workdir}/ {params.remote_dir}/workdir/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.bin_info} {params.remote_dir}/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.bins2species} {params.remote_dir}/ 2>> {log}  
+    
+            rm -rf {params.config_dir}  
+            """
 
-        bypy upload {input.workdir}/ {params.remote_dir}/workdir/ 2>> {log}
-        bypy upload {input.bin_info} {params.remote_dir}/ 2>> {log}
-        bypy upload {input.bins2species} {params.remote_dir}/ 2>> {log}
-        """
+    rule upload_drep_report:
+        input:
+            report=WORKDIR + "reports/bin_report_metabat.html"
+        output:
+            mark=touch(BIN_RUN + "/.drep_report_upload.done")
+        params:
+            remote_dir=config.get("upload_tag","") + "binning/report",
+            config_dir="/tmp/bypy_drep_report"
+        conda:
+            "../envs/baiduyun.yaml"
+        resources:
+            upload_slots=1,
+        log:
+            "logs/binning/upload/drep_report.log"
+        shell:
+            """  
+            mkdir -p {params.config_dir}  
+            cp ~/.bypy/bypy.json {params.config_dir}/  
+    
+            bypy --config-dir {params.config_dir} mkdir {params.remote_dir} 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.report} {params.remote_dir}/bin_report_metabat.html 2>> {log}  
+    
+            rm -rf {params.config_dir}  
+            """
 
-rule upload_drep_report:
-    input:
-        report=WORKDIR + "reports/bin_report_metabat.html"
-    output:
-        mark=touch(BIN_RUN + "/.drep_report_upload.done")
-    params:
-        remote_dir=config.get("upload_tag", "") + "binning/report"
-    conda:
-        "../envs/baiduyun.yaml"
-    log:
-        "logs/binning/upload/drep_report.log"
-    shell:
-        """
-        bypy mkdir {params.remote_dir} 2>> {log}
-        bypy upload {input.report} {params.remote_dir}/bin_report_metabat.html 2>> {log}
-        """
-
-rule finish_drep:
-    input:
-        drep_upload=BIN_RUN + "/derep/.drep.upload.done",
-        report_upload=BIN_RUN + "/.drep_report_upload.done"
-    output:
-        touch(BIN_RUN + "/rule_drep.done")
+    rule finish_drep_with_upload:
+        input:
+            drep_upload=BIN_RUN + "/derep/.drep.upload.done",
+            report_upload=BIN_RUN + "/.drep_report_upload.done"
+        output:
+            touch(BIN_RUN + "/rule_drep.done")
+else:
+    rule finish_drep:
+        input:
+            workdir=BIN_RUN + "/derep/workdir",
+            bin_info=BIN_RUN + "/derep/bin_info.tsv",
+            bins2species=BIN_RUN + "/derep/bins2species.tsv",
+            report=WORKDIR + "reports/bin_report_metabat.html",
+        output:
+            touch(BIN_RUN + "/rule_drep.done")

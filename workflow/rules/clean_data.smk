@@ -3,6 +3,14 @@ localrules:
 
 CLEAN_RUN = os.path.join(WORKDIR, config["path"]["clean_path"])
 
+# SRA_RUN = os.path.join(WORKDIR, config["path"]["sra_path"])
+#
+# PAIRED_END = SAMPLES_TABLE.columns.str.contains("PAIRED").any() or config.get(
+#     "interleaved_fastqs", False
+# )
+#
+# Sra_frac = ["_1", "_2"] if PAIRED_END else [""]
+
 # def seq_se_or_paired(wildcards):
 #     directory = SRA_RUN + {wildcards.sra_run}
 #     fq_files = [f for f in os.listdir(directory) if f.endswith('.fastq.gz')]
@@ -229,43 +237,56 @@ localrules:
     upload_clean_data,
     finish_clean_data,
 
-rule upload_clean_data:
-    input:
-        fastqs = expand(CLEAN_RUN + "/{{sra_run}}/{{sra_run}}_kneaddata{frac}.fastq.gz",frac=Sra_frac),
-        stats = CLEAN_RUN + "/{sra_run}/{sra_run}.tsv",
-        clean_done = CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.done",
-    output:
-        mark=touch(CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.uploaded")
-    params:
-        remote_dir=config.get("upload_tag", "") + "clean_data/{sra_run}",
-        sra_dir=SRA_RUN + "/{sra_run}"
-    log:
-        "logs/cleandata/upload/{sra_run}.log"
-    threads: 1
-    conda:
-        "../envs/baiduyun.yaml"
-    shell:
-        """  
-        bypy mkdir {params.remote_dir} 2>> {log}  
+if config.get("upload", False):
+    rule upload_clean_data:
+        input:
+            fastqs = expand(CLEAN_RUN + "/{{sra_run}}/{{sra_run}}_kneaddata{frac}.fastq.gz",frac=Sra_frac),
+            stats = CLEAN_RUN + "/{sra_run}/{sra_run}.tsv",
+            clean_done = CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.done",
+        output:
+            mark=touch(CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.uploaded")
+        params:
+            remote_dir=config.get("upload_tag", "") + "clean_data/{sra_run}",
+            sra_dir=SRA_RUN + "/{sra_run}",
+            config_dir=lambda wildcards: f"/tmp/bypy_clean_{wildcards.sra_run}",
+        log:
+            "logs/cleandata/upload/{sra_run}.log"
+        threads: 1
+        conda:
+            "../envs/baiduyun.yaml"
+        resources:
+            upload_slots=1,
+        shell:
+            """  
+            mkdir -p {params.config_dir}  
+            cp ~/.bypy/bypy.json {params.config_dir}/
+            
+            bypy --config-dir {params.config_dir} mkdir {params.remote_dir} 2>> {log}  
+            
+            for f in {input.fastqs}; do  
+                bypy --config-dir {params.config_dir} upload "$f" {params.remote_dir}/ 2>> {log}   
+            done 
         
-        for f in {input.fastqs}; do  
-            bypy upload "$f" {params.remote_dir}/ 2>> {log}  
-            bypy compare "$f" {params.remote_dir}/ 2>> {log}  
-        done 
-    
-        bypy upload {input.stats} {params.remote_dir}/ 2>> {log}  
-        bypy compare {input.stats} {params.remote_dir}/ 2>> {log}  
-        
-        # rm -rf {params.sra_dir}/*.fastq.gz 2>> {log} 
-        """
+            bypy --config-dir {params.config_dir} upload {input.stats} {params.remote_dir}/ 2>> {log}    
+            
+            rm -rf {params.config_dir}
+            
+            # rm -rf {params.sra_dir}/*.fastq.gz 2>> {log} 
+            """
 
-rule finish_clean_data:
-    input:
-        clean_marks=expand(CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.done",sra_run=IDS),
-        upload_marks=expand(CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.uploaded",sra_run=IDS)
-    output:
-        touch(CLEAN_RUN + "/rule_clean_data.done")
-
+    rule finish_clean_data_with_upload:
+        input:
+            upload_marks=expand(CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.uploaded",sra_run=IDS)
+        output:
+            touch(CLEAN_RUN + "/rule_clean_data.done")
+else:
+    rule finish_clean_data:
+        input:
+            fastqs = expand(CLEAN_RUN + "/{{sra_run}}/{{sra_run}}_kneaddata{frac}.fastq.gz",frac=Sra_frac),
+            stats = expand(CLEAN_RUN + "/{sra_run}/{sra_run}.tsv", sra_run=IDS),
+            clean_done = expand(CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.done", sra_run=IDS),
+        output:
+            touch(CLEAN_RUN + "/rule_clean_data.done")
 
 
     # run:

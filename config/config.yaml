@@ -46,6 +46,7 @@ dbs:
 
 database_dir: ../../DB # 注意检查
 
+upload: true
 upload_tag: batch1/ # 不需要请注释掉
 
 host:
@@ -112,7 +113,7 @@ kneaddata_opt:
 # Assembly
 ###################
 # megahit_set
-megahit_min_count: 1
+megahit_min_count: 2
 megahit_k_min: 21
 megahit_k_max: 99
 megahit_k_step: 10

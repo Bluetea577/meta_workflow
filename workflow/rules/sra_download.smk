@@ -62,6 +62,8 @@ rule download_data:
         "logs/benchmarks/SRAdownload/download/{sra_run}.tsv"
     conda:
         "../envs/kingfisher.yaml"
+    resources:
+        download_slots=1,
     shell:
         """
         kingfisher get -r {wildcards.sra_run} \

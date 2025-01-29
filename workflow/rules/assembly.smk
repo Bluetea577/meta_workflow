@@ -176,6 +176,7 @@ rule pileup_contigs_sample:
         covhist=ASSE_RUN + "/megahit/{sra_run}/contig_stats/postfilter_coverage_histogram.txt",
         covstats=ASSE_RUN + "/megahit/{sra_run}/contig_stats/postfilter_coverage_stats.txt",
         bincov=ASSE_RUN + "/megahit/{sra_run}/contig_stats/postfilter_coverage_binned.txt",
+        mark=touch(ASSE_RUN + "/megahit/{sra_run}/contig_stats/.contig_stats.done"),
     params:
         pileup_secondary=(
             "t"
@@ -340,95 +341,119 @@ localrules:
     upload_assembly_report,
     finish_assembly,
 
-rule upload_assembly:
-    input:
-        raw_contigs = ASSE_RUN + "/megahit/{sra_run}/{sra_run}_raw_contigs.fasta",
-        contigs = ASSE_RUN + "/megahit/{sra_run}/{sra_run}_final_contigs.fasta",
-        stats = ASSE_RUN + "/megahit/{sra_run}/final_contig_stats.txt",
-        mapping = ASSE_RUN + "/megahit/{sra_run}/old2new_contig_names.tsv",
-        bam = ASSE_RUN + "/megahit/{sra_run}/sequence_alignment/{sra_run}_sort.bam",
-        bai = ASSE_RUN + "/megahit/{sra_run}/sequence_alignment/{sra_run}_sort.bam.bai",
-        coverage_files = [
-            ASSE_RUN + "/megahit/{sra_run}/contig_stats/postfilter_coverage_histogram.txt",
-            ASSE_RUN + "/megahit/{sra_run}/contig_stats/postfilter_coverage_stats.txt",
-            ASSE_RUN + "/megahit/{sra_run}/contig_stats/postfilter_coverage_binned.txt"
-        ],
-        predicted_genes = [
-            ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.faa",
-            ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.fna",
-            ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.gff",
-            ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.tsv",
-        ],
-        clean_flags=CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.uploaded",
-    output:
-        mark = touch(ASSE_RUN + "/megahit/{sra_run}/.{sra_run}.upload.done")
-    params:
-        remote_dir = config.get("upload_tag", "") + "assembly/{sra_run}",
-        clean_dir=CLEAN_RUN + "/{sra_run}",
-        assem_dir=ASSE_RUN + "/megahit/{sra_run}",
-        pred_dir=ASSE_RUN + "/predicted_genes/{sra_run}",
-    conda:
-        "../envs/baiduyun.yaml"
-    log:
-        "logs/assembly/upload/{sra_run}.log"
-    shell:
-        """  
-        # 创建远程目录
-        bypy mkdir {params.remote_dir} 2>> {log}
-        bypy mkdir {params.remote_dir}/contig_stats 2>> {log}
-        bypy mkdir {params.remote_dir}/sequence_alignment 2>> {log}
-        bypy mkdir {params.remote_dir}/predicted_genes 2>> {log}
+if config.get("upload", False):
+    rule upload_assembly:
+        input:
+            raw_contigs = ASSE_RUN + "/megahit/{sra_run}/{sra_run}_raw_contigs.fasta",
+            contigs = ASSE_RUN + "/megahit/{sra_run}/{sra_run}_final_contigs.fasta",
+            stats = ASSE_RUN + "/megahit/{sra_run}/final_contig_stats.txt",
+            mapping = ASSE_RUN + "/megahit/{sra_run}/old2new_contig_names.tsv",
+            bam = ASSE_RUN + "/megahit/{sra_run}/sequence_alignment/{sra_run}_sort.bam",
+            bai = ASSE_RUN + "/megahit/{sra_run}/sequence_alignment/{sra_run}_sort.bam.bai",
+            coverage_files = [
+                ASSE_RUN + "/megahit/{sra_run}/contig_stats/postfilter_coverage_histogram.txt",
+                ASSE_RUN + "/megahit/{sra_run}/contig_stats/postfilter_coverage_stats.txt",
+                ASSE_RUN + "/megahit/{sra_run}/contig_stats/postfilter_coverage_binned.txt"
+            ],
+            predicted_genes = [
+                ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.faa",
+                ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.fna",
+                ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.gff",
+                ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.tsv",
+            ],
+            clean_flags = CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.uploaded",
+        output:
+            mark = touch(ASSE_RUN + "/megahit/{sra_run}/.{sra_run}.upload.done")
+        params:
+            remote_dir=config.get("upload_tag","") + "assembly/{sra_run}",
+            clean_dir=CLEAN_RUN + "/{sra_run}",
+            assem_dir=ASSE_RUN + "/megahit/{sra_run}",
+            pred_dir=ASSE_RUN + "/predicted_genes/{sra_run}",
+            config_dir=lambda wildcards: f"/tmp/bypy_assembly_{wildcards.sra_run}"
+        conda:
+            "../envs/baiduyun.yaml"
+        resources:
+            upload_slots=1,
+        log:
+            "logs/assembly/upload/{sra_run}.log"
+        shell:
+            """  
+            mkdir -p {params.config_dir}  
+            cp ~/.bypy/bypy.json {params.config_dir}/  
+    
+            # 创建远程目录  
+            bypy --config-dir {params.config_dir} mkdir {params.remote_dir} 2>> {log}  
+            bypy --config-dir {params.config_dir} mkdir {params.remote_dir}/contig_stats 2>> {log}  
+            bypy --config-dir {params.config_dir} mkdir {params.remote_dir}/sequence_alignment 2>> {log}  
+            bypy --config-dir {params.config_dir} mkdir {params.remote_dir}/predicted_genes 2>> {log}  
+    
+            # 上传文件  
+            bypy --config-dir {params.config_dir} upload {input.raw_contigs} {params.remote_dir}/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.contigs} {params.remote_dir}/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.stats} {params.remote_dir}/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.mapping} {params.remote_dir}/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.bam} {params.remote_dir}/sequence_alignment/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.bai} {params.remote_dir}/sequence_alignment/ 2>> {log}  
+    
+            for f in {input.coverage_files}; do  
+                bypy --config-dir {params.config_dir} upload "$f" {params.remote_dir}/contig_stats/ 2>> {log}  
+            done  
+    
+            for f in {input.predicted_genes}; do  
+                bypy --config-dir {params.config_dir} upload "$f" {params.remote_dir}/predicted_genes/ 2>> {log}  
+            done  
+    
+            rm -rf {params.config_dir}  
+    
+            # rm -rf {params.clean_dir}/*.fastq.gz 2>> {log}  
+            # rm -rf {params.pred_dir}/*.faa 2>> {log}  
+            # rm -rf {params.pred_dir}/*.fna 2>> {log}  
+            # rm -rf {params.pred_dir}/*.gff 2>> {log}  
+            # rm -rf {params.assem_dir}/{wildcards.sra_run}_prefilter.contigs.fa 2>> {log}  
+            # rm -rf {params.assem_dir}/{wildcards.sra_run}_prefilter_contigs.fasta 2>> {log}  
+            """
 
-        # 上传文件
-        bypy upload {input.raw_contigs} {params.remote_dir}/ 2>> {log}
-        bypy upload {input.contigs} {params.remote_dir}/ 2>> {log}
-        bypy upload {input.stats} {params.remote_dir}/ 2>> {log}
-        bypy upload {input.mapping} {params.remote_dir}/ 2>> {log}
-        bypy upload {input.bam} {params.remote_dir}/sequence_alignment/ 2>> {log}
-        bypy upload {input.bai} {params.remote_dir}/sequence_alignment/ 2>> {log}
-        
-        for f in {input.coverage_files}; do
-            bypy upload "$f" {params.remote_dir}/contig_stats/ 2>> {log}
-        done
+    rule upload_assembly_report:
+        input:
+            stats=WORKDIR + "stats/combined_contig_stats.tsv",
+            report=WORKDIR + "reports/assembly_report.html",
+            stats_done=WORKDIR + "stats/.combined_stats.done",
+            report_done=WORKDIR + "reports/.assembly_report.done"
+        output:
+            mark=touch(ASSE_RUN + "/.assembly_report_upload.done")
+        params:
+            remote_dir=config.get("upload_tag","") + "assembly/report",
+            config_dir="/tmp/bypy_assembly_report"
+        conda:
+            "../envs/baiduyun.yaml"
+        resources:
+            upload_slots=1,
+        log:
+            "logs/assembly/upload_report.log"
+        shell:
+            """  
+            mkdir -p {params.config_dir}  
+            cp ~/.bypy/bypy.json {params.config_dir}/  
+    
+            bypy --config-dir {params.config_dir} mkdir {params.remote_dir} 2>> {log}  
+    
+            bypy --config-dir {params.config_dir} upload {input.stats} {params.remote_dir}/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.report} {params.remote_dir}/ 2>> {log}  
+    
+            rm -rf {params.config_dir}  
+            """
 
-        for f in {input.predicted_genes}; do
-            bypy upload "$f" {params.remote_dir}/predicted_genes/ 2>> {log}
-        done
-        
-        # rm -rf {params.clean_dir}/*.fastq.gz 2>> {log}
-        # rm -rf {params.pred_dir}/*.faa 2>> {log}
-        # rm -rf {params.pred_dir}/*.fna 2>> {log}
-        # rm -rf {params.pred_dir}/*.gff 2>> {log}
-        # rm -rf {params.assem_dir}/{wildcards.sra_run}_prefilter.contigs.fa 2>> {log}
-        # rm -rf {params.assem_dir}/{wildcards.sra_run}_prefilter_contigs.fasta 2>> {log}
-        """
-
-rule upload_assembly_report:
-    input:
-        stats = WORKDIR + "stats/combined_contig_stats.tsv",
-        report = WORKDIR + "reports/assembly_report.html",
-        stats_done = WORKDIR + "stats/.combined_stats.done",
-        report_done = WORKDIR + "reports/.assembly_report.done"
-    output:
-        mark = touch(ASSE_RUN + "/.assembly_report_upload.done")
-    params:
-        remote_dir = config.get("upload_tag", "") + "assembly/report"
-    conda:
-        "../envs/baiduyun.yaml"
-    log:
-        "logs/assembly/upload_report.log"
-    shell:
-        """  
-        bypy mkdir {params.remote_dir} 2>> {log}   
-
-        bypy upload {input.stats} {params.remote_dir}/ 2>> {log}  
-        bypy upload {input.report} {params.remote_dir}/ 2>> {log}  
-        """
-
-rule finish_assembly:
-    input:
-        report_done = WORKDIR + "reports/.assembly_report.done",
-        upload_done = expand(ASSE_RUN + "/megahit/{sra_run}/.{sra_run}.upload.done", sra_run=IDS),
-        report_upload_done = ASSE_RUN + "/.assembly_report_upload.done"
-    output:
-        touch(ASSE_RUN + "/rule_assembly.done")
+    rule finish_assembly_with_upload:
+        input:
+            report_done = WORKDIR + "reports/.assembly_report.done",
+            upload_done = expand(ASSE_RUN + "/megahit/{sra_run}/.{sra_run}.upload.done", sra_run=IDS),
+            report_upload_done = ASSE_RUN + "/.assembly_report_upload.done"
+        output:
+            touch(ASSE_RUN + "/rule_assembly.done")
+else:
+    rule finish_assembly:
+        input:
+            report_done=WORKDIR + "reports/.assembly_report.done",
+            contig_stat=expand(ASSE_RUN + "/megahit/{sra_run}/contig_stats/.contig_stats.done",sra_run=IDS),
+        output:
+            touch(ASSE_RUN + "/rule_assembly.done")

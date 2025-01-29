@@ -119,35 +119,51 @@ localrules:
     upload_gtdbtk,
     finish_gtdbtk,
 
-rule upload_gtdbtk:
-    """上传GTDB-Tk分析结果"""
-    input:
-        gtdbtk_dir=GTDB_DIR,
-        classify_done=GTDB_DIR + "/.gtdbtk_complete",
-        tree=GTDB_DIR + "/phylogeny/fasttree.nwk"
-    output:
-        mark=touch(GTDB_DIR + "/.upload_complete")
-    params:
-        remote_dir=config.get("upload_tag", "") + "taxonomy/gtdbtk"
-    conda:
-        "../envs/baiduyun.yaml"
-    retries: 3
-    log:
-        "logs/gtdbtk/upload.log"
-    shell:
-        """  
-        # 创建远程目录  
-        bypy mkdir {params.remote_dir} 2>> {log}  
+if config.get("upload", False):
+    rule upload_gtdbtk:
+        """上传GTDB-Tk分析结果"""
+        input:
+            gtdbtk_dir=GTDB_DIR,
+            classify_done=GTDB_DIR + "/.gtdbtk_complete",
+            tree=GTDB_DIR + "/phylogeny/fasttree.nwk"
+        output:
+            mark=touch(GTDB_DIR + "/.upload_complete")
+        params:
+            remote_dir=config.get("upload_tag","") + "taxonomy/gtdbtk",
+            config_dir="/tmp/bypy_gtdbtk"
+        conda:
+            "../envs/baiduyun.yaml"
+        resources:
+            upload_slots=1,
+        # retries: 3
+        log:
+            "logs/gtdbtk/upload.log"
+        shell:
+            """  
+            mkdir -p {params.config_dir}  
+            cp ~/.bypy/bypy.json {params.config_dir}/  
+    
+            # 创建远程目录  
+            bypy --config-dir {params.config_dir} mkdir {params.remote_dir} 2>> {log}  
+    
+            # 上传GTDB-Tk结果  
+            bypy --config-dir {params.config_dir} upload {input.gtdbtk_dir}/ {params.remote_dir}/ 2>> {log}  
+    
+            rm -rf {params.config_dir}  
+            """
 
-        # 上传GTDB-Tk结果  
-        bypy upload {input.gtdbtk_dir}/ {params.remote_dir}/ 2>> {log}  
-        """
+    rule finish_gtdbtk_with_upload:
+        """标记GTDB-Tk分析完成"""
+        input:
+            upload=GTDB_DIR + "/.upload_complete",
+        output:
+            touch(GTDB_DIR + "/rule_gtdbtk.done")
 
-rule finish_gtdbtk:
-    """标记GTDB-Tk分析完成"""
-    input:
-        classify=GTDB_DIR + "/.gtdbtk_complete",
-        tree=GTDB_DIR + "/phylogeny/fasttree.nwk",
-        upload=GTDB_DIR + "/.upload_complete"
-    output:
-        touch(GTDB_DIR + "/rule_gtdbtk.done")
+else:
+    rule finish_gtdbtk:
+        input:
+            gtdbtk_dir = GTDB_DIR,
+            classify=GTDB_DIR + "/.gtdbtk_complete",
+            tree=GTDB_DIR + "/phylogeny/fasttree.nwk",
+        output:
+            touch(GTDB_DIR + "/rule_gtdbtk.done")

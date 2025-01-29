@@ -131,51 +131,66 @@ localrules:
     upload_prokka,
     finish_prokka,
 
-rule upload_prokka:
-    """上传Prokka注释结果"""
-    input:
-        combined_faa=PROKKA_DIR + "/all_proteins.faa",
-        combined_ffn=PROKKA_DIR + "/all_genes.ffn",
-        combined_tsv=PROKKA_DIR + "/all_annotations.tsv",
-        stats=PROKKA_DIR + "/annotation_statistics.txt"
-    output:
-        mark=touch(PROKKA_DIR + "/.upload_complete")
-    params:
-        remote_dir=config.get("upload_tag", "") + "annotation/prokka",
-        prokka_dir=PROKKA_DIR
-    conda:
-        "../envs/baiduyun.yaml"
-    retries: 3
-    log:
-        "logs/prokka/upload.log"
-    shell:
-        """  
-        # 创建远程目录  
-        bypy mkdir {params.remote_dir} 2>> {log}  
+if config.get("upload", False):
+    rule upload_prokka:
+        """上传Prokka注释结果"""
+        input:
+            combined_faa=PROKKA_DIR + "/all_proteins.faa",
+            combined_ffn=PROKKA_DIR + "/all_genes.ffn",
+            combined_tsv=PROKKA_DIR + "/all_annotations.tsv",
+            stats=PROKKA_DIR + "/annotation_statistics.txt"
+        output:
+            mark=touch(PROKKA_DIR + "/.upload_complete")
+        params:
+            remote_dir=config.get("upload_tag","") + "annotation/prokka",
+            prokka_dir=PROKKA_DIR,
+            config_dir="/tmp/bypy_prokka"
+        conda:
+            "../envs/baiduyun.yaml"
+        resources:
+            upload_slots=1,
+        # retries: 3
+        log:
+            "logs/prokka/upload.log"
+        shell:
+            """  
+            mkdir -p {params.config_dir}  
+            cp ~/.bypy/bypy.json {params.config_dir}/  
+    
+            # 创建远程目录  
+            bypy --config-dir {params.config_dir} mkdir {params.remote_dir} 2>> {log}  
+    
+            # 上传合并后的结果文件  
+            bypy --config-dir {params.config_dir} upload {input.combined_faa} {params.remote_dir}/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.combined_ffn} {params.remote_dir}/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.combined_tsv} {params.remote_dir}/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.stats} {params.remote_dir}/ 2>> {log}  
+    
+            # 上传单个基因组的注释结果  
+            for genome_dir in {params.prokka_dir}/*/; do  
+                if [ -d "$genome_dir" ]; then  
+                    genome=$(basename $genome_dir)  
+                    bypy --config-dir {params.config_dir} mkdir {params.remote_dir}/$genome 2>> {log}  
+                    bypy --config-dir {params.config_dir} upload $genome_dir/ {params.remote_dir}/$genome/ 2>> {log}  
+                fi  
+            done  
+    
+            rm -rf {params.config_dir}  
+            """
 
-        # 上传合并后的结果文件  
-        bypy upload {input.combined_faa} {params.remote_dir}/ 2>> {log}  
-        bypy upload {input.combined_ffn} {params.remote_dir}/ 2>> {log}  
-        bypy upload {input.combined_tsv} {params.remote_dir}/ 2>> {log}  
-        bypy upload {input.stats} {params.remote_dir}/ 2>> {log}  
+    rule finish_prokka_with_upload:
+        """标记Prokka注释完成"""
+        input:
+            upload=PROKKA_DIR + "/.upload_complete"
+        output:
+            touch(PROKKA_DIR + "/rule_prokka.done")
 
-        # 上传单个基因组的注释结果  
-        for genome_dir in {params.prokka_dir}/*/; do  
-            if [ -d "$genome_dir" ]; then  
-                genome=$(basename $genome_dir)  
-                bypy mkdir {params.remote_dir}/$genome 2>> {log}  
-                bypy upload $genome_dir/ {params.remote_dir}/$genome/ 2>> {log}  
-            fi  
-        done  
-        """
-
-rule finish_prokka:
-    """标记Prokka注释完成"""
-    input:
-        combined_faa=PROKKA_DIR + "/all_proteins.faa",
-        combined_ffn=PROKKA_DIR + "/all_genes.ffn",
-        combined_tsv=PROKKA_DIR + "/all_annotations.tsv",
-        stats=PROKKA_DIR + "/annotation_statistics.txt",
-        upload=PROKKA_DIR + "/.upload_complete"
-    output:
-        touch(PROKKA_DIR + "/rule_prokka.done")
+else:
+    rule finish_prokka:
+        input:
+            combined_faa=PROKKA_DIR + "/all_proteins.faa",
+            combined_ffn=PROKKA_DIR + "/all_genes.ffn",
+            combined_tsv=PROKKA_DIR + "/all_annotations.tsv",
+            stats=PROKKA_DIR + "/annotation_statistics.txt",
+        output:
+            touch(PROKKA_DIR + "/rule_prokka.done")
