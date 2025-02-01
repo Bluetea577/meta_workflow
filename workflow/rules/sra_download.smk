@@ -65,11 +65,13 @@ rule download_data:
     resources:
         download_slots=1,
     retries: 3,
+    threads: 1,
     shell:
         """
         kingfisher get -r {wildcards.sra_run} \
             -m ena-ftp aws-http \
             -f fastq.gz \
+            -t {threads} \
             --output-directory {params.outdir} 2> {log}
         """
 
