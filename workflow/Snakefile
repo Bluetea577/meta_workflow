@@ -32,14 +32,14 @@ include: "rules/prokka.smk"
 
 rule all:
     input:
-        SRA_RUN + "/rule_sra_download.done",
-        CLEAN_RUN+ "/rule_clean_data.done",
-        ASSE_RUN+ "/rule_assembly.done",
-        BIN_RUN+ "/rule_binning.done",
-        BIN_RUN+ "/rule_drep.done",
-        BIN_RUN+ "/rule_mags.done",
-        GTDB_DIR+ "/rule_gtdbtk.done",
-        PROKKA_DIR+ "/rule_prokka.done",
+        SRA_RUN + "/rule_sra_download" + config.get("samples_batch", "") + ".done",
+        CLEAN_RUN + "/rule_clean_data" + config.get("samples_batch", "") + ".done",
+        ASSE_RUN + "/rule_assembly" + config.get("samples_batch", "") + ".done",
+        BIN_RUN + "/rule_binning" + config.get("samples_batch", "") + ".done",
+        BIN_RUN + "/rule_drep" + config.get("samples_batch", "") + ".done",
+        BIN_RUN + "/rule_mags" + config.get("samples_batch", "") + ".done",
+        GTDB_DIR + config.get("samples_batch", "") + "/rule_gtdbtk.done",
+        PROKKA_DIR + config.get("samples_batch", "") + "/rule_prokka.done",
 
 for r in workflow.rules:
     if not "mem_mb" in r.resources:

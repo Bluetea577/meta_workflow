@@ -180,8 +180,8 @@ rule combine_bin_abundances:
         status_files=expand(BIN_RUN + "/metabat/{sra_run}/bin_status",
             sra_run=IDS),
     output:
-        matrix=BIN_RUN + "/bin_abundances/bin_abundance_matrix.tsv",
-        summary=BIN_RUN + "/bin_abundances/bin_abundance_summary.tsv",# 添加一个汇总文件
+        matrix=BIN_RUN + "/bin_abundances/bin_abundance_matrix" + config.get("samples_batch", "") + ".tsv",
+        summary=BIN_RUN + "/bin_abundances/bin_abundance_summary" + config.get("samples_batch", "") + ".tsv",# 添加一个汇总文件
     threads: 2
     resources:
         mem_mb=3500 * 2
@@ -234,12 +234,12 @@ rule combine_bin_abundances:
 rule map_to_representative_mags:
     """将bin统计量映射到代表性MAGs"""
     input:
-        summary=BIN_RUN + "/bin_abundances/bin_abundance_summary.tsv",
-        bins2species=BIN_RUN + "/derep/bins2species.tsv",
+        summary=BIN_RUN + "/bin_abundances/bin_abundance_summary" + config.get("samples_batch", "") + ".tsv",
+        bins2species=BIN_RUN + "/derep/bins2species" + config.get("samples_batch", "") + ".tsv",
     output:
-        coverage=BIN_RUN + "/bin_abundances/species_coverage_matrix.tsv",
-        abundance=BIN_RUN + "/bin_abundances/species_relative_abundance_matrix.tsv",
-        tpm=BIN_RUN + "/bin_abundances/species_tpm_matrix.tsv"
+        coverage=BIN_RUN + "/bin_abundances/species_coverage_matrix" + config.get("samples_batch", "") + ".tsv",
+        abundance=BIN_RUN + "/bin_abundances/species_relative_abundance_matrix" + config.get("samples_batch", "") + ".tsv",
+        tpm=BIN_RUN + "/bin_abundances/species_tpm_matrix" + config.get("samples_batch", "") + ".tsv",
     threads: 2
     resources:
         mem_mb=3500 * 2
@@ -333,12 +333,12 @@ if config.get("upload", False):
                 sra_run=IDS),
             bin_abundance=expand(BIN_RUN + "/bin_abundances/{sra_run}_bin_abundance.tsv",
                 sra_run=IDS),
-            bin_matrix=BIN_RUN + "/bin_abundances/bin_abundance_matrix.tsv",# 改名以避免重复
-            species_coverage=BIN_RUN + "/bin_abundances/species_coverage_matrix.tsv",
-            species_abundance=BIN_RUN + "/bin_abundances/species_relative_abundance_matrix.tsv",
-            species_tpm=BIN_RUN + "/bin_abundances/species_tpm_matrix.tsv"
+            bin_matrix=BIN_RUN + "/bin_abundances/bin_abundance_matrix" + config.get("samples_batch", "") + ".tsv",# 改名以避免重复
+            species_coverage=BIN_RUN + "/bin_abundances/species_coverage_matrix" + config.get("samples_batch", "") + ".tsv",
+            species_abundance=BIN_RUN + "/bin_abundances/species_relative_abundance_matrix" + config.get("samples_batch", "") + ".tsv",
+            species_tpm=BIN_RUN + "/bin_abundances/species_tpm_matrix" + config.get("samples_batch", "") + ".tsv"
         output:
-            mark=touch(BIN_RUN + "/.abundance_upload.done")
+            mark=touch(BIN_RUN + "/.abundance_upload" + config.get("samples_batch", "") + ".done")
         params:
             remote_dir=config.get("upload_tag","") + "binning/abundance",
             config_dir="/tmp/bypy_abundances"
@@ -347,7 +347,7 @@ if config.get("upload", False):
         resources:
             upload_slots=1,
         log:
-            "logs/binning/upload/abundance.log"
+            "logs/binning/upload/abundance" + config.get("samples_batch", "") + ".log"
         shell:
             """  
             mkdir -p {params.config_dir}  
@@ -379,9 +379,9 @@ if config.get("upload", False):
 
     rule finish_mags_with_upload:
         input:
-            abundance_upload=BIN_RUN + "/.abundance_upload.done"
+            abundance_upload=BIN_RUN + "/.abundance_upload" + config.get("samples_batch", "") + ".done"
         output:
-            touch(BIN_RUN + "/rule_mags.done")
+            touch(BIN_RUN + "/rule_mags" + config.get("samples_batch", "") + ".done")
 
 else:
     rule finish_mags:
@@ -390,9 +390,9 @@ else:
                 sra_run=IDS),
             bin_abundance = expand(BIN_RUN + "/bin_abundances/{sra_run}_bin_abundance.tsv",
                 sra_run=IDS),
-            bin_matrix = BIN_RUN + "/bin_abundances/bin_abundance_matrix.tsv",  # 改名以避免重复
-            species_coverage = BIN_RUN + "/bin_abundances/species_coverage_matrix.tsv",
-            species_abundance = BIN_RUN + "/bin_abundances/species_relative_abundance_matrix.tsv",
-            species_tpm = BIN_RUN + "/bin_abundances/species_tpm_matrix.tsv"
+            bin_matrix = BIN_RUN + "/bin_abundances/bin_abundance_matrix" + config.get("samples_batch", "") + ".tsv",  # 改名以避免重复
+            species_coverage = BIN_RUN + "/bin_abundances/species_coverage_matrix" + config.get("samples_batch", "") + ".tsv",
+            species_abundance = BIN_RUN + "/bin_abundances/species_relative_abundance_matrix" + config.get("samples_batch", "") + ".tsv",
+            species_tpm = BIN_RUN + "/bin_abundances/species_tpm_matrix" + config.get("samples_batch", "") + ".tsv"
         output:
-            touch(BIN_RUN + "/rule_mags.done")
+            touch(BIN_RUN + "/rule_mags" + config.get("samples_batch", "") + ".done")

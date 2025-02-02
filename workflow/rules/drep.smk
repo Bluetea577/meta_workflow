@@ -1,8 +1,8 @@
 rule quality_file:
     input:
-        BIN_RUN + "/metabat/filtered/filtered_bins_info.tsv",
+        BIN_RUN + "/metabat/filtered/filtered_bins_info" + config.get("samples_batch", "") +".tsv",
     output:
-        temp(BIN_RUN + "/metabat/filtered/filtered_bins_info_for_drep.csv"),
+        temp(BIN_RUN + "/metabat/filtered/filtered_bins_info_for_drep" + config.get("samples_batch", "") + ".csv"),
     threads: 1
     run:
         import pandas as pd
@@ -24,13 +24,13 @@ rule quality_file:
 # use drep
 rule run_drep:
     input:
-        paths=BIN_RUN + "/metabat/filtered/filtered_bins_paths.txt",
-        quality=BIN_RUN + "/metabat/filtered/filtered_bins_info_for_drep.csv"
+        paths=BIN_RUN + "/metabat/filtered/filtered_bins_paths" + config.get("samples_batch", "") + ".txt",
+        quality=BIN_RUN + "/metabat/filtered/filtered_bins_info_for_drep" + config.get("samples_batch", "") + ".csv"
     output:
-        workdir=directory(BIN_RUN + "/derep/workdir"),
-        genome_dir=directory(BIN_RUN + "/derep/workdir/dereplicated_genomes"),
+        workdir=directory(BIN_RUN + "/derep/workdir" + config.get("samples_batch", "")),
+        genome_dir=directory(BIN_RUN + "/derep/workdir" + config.get("samples_batch", "") + "/dereplicated_genomes"),
     log:
-        "logs/binning/drep/drep.log"
+        "logs/binning/drep/drep" + config.get("samples_batch", "") + ".log"
     params:
         min_comp=config["drep"].get("min_completeness",75),
         max_cont=config["drep"].get("max_contamination",25),
@@ -62,13 +62,13 @@ rule run_drep:
 
 rule process_drep_results:
     input:
-        workdir=BIN_RUN + "/derep/workdir",
-        quality=BIN_RUN + "/metabat/filtered/filtered_bins_info.tsv"
+        workdir=BIN_RUN + "/derep/workdir" + config.get("samples_batch", ""),
+        quality=BIN_RUN + "/metabat/filtered/filtered_bins_info" + config.get("samples_batch", "") +".tsv"
     output:
-        merged_info=BIN_RUN + "/derep/bin_info.tsv",
-        bins2species=BIN_RUN + "/derep/bins2species.tsv",
+        merged_info=BIN_RUN + "/derep/bin_info" + config.get("samples_batch", "") + ".tsv",
+        bins2species=BIN_RUN + "/derep/bins2species" + config.get("samples_batch", "") + ".tsv",
     log:
-        "logs/binning/drep/process_drep_results.log"
+        "logs/binning/drep/process_drep_results" + config.get("samples_batch", "") + ".log"
     conda:
         "../envs/drep.yaml"
     script:
@@ -186,14 +186,14 @@ localrules:
 
 rule build_bin_report:
     input:
-        bin_info=BIN_RUN + "/derep/bin_info.tsv",
-        bins2species=BIN_RUN + "/derep/bins2species.tsv",
+        bin_info=BIN_RUN + "/derep/bin_info" + config.get("samples_batch", "") + ".tsv",
+        bins2species=BIN_RUN + "/derep/bins2species" + config.get("samples_batch", "") + ".tsv",
     output:
-        report=WORKDIR + "reports/bin_report_metabat.html",
+        report=WORKDIR + "reports/bin_report_metabat" + config.get("samples_batch", "") + ".html",
     conda:
         "../envs/report.yaml"
     log:
-        "logs/binning/report_binning.log",
+        "logs/binning/report_binning" + config.get("samples_batch", "") + ".log",
     script:
         "../scripts/bin_report.py"
 
@@ -205,11 +205,11 @@ localrules:
 if config.get("upload", False):
     rule upload_drep:
         input:
-            workdir=BIN_RUN + "/derep/workdir",
-            bin_info=BIN_RUN + "/derep/bin_info.tsv",
-            bins2species=BIN_RUN + "/derep/bins2species.tsv",
+            workdir=BIN_RUN + "/derep/workdir" + config.get("samples_batch", ""),
+            bin_info=BIN_RUN + "/derep/bin_info" + config.get("samples_batch", "") + ".tsv",
+            bins2species=BIN_RUN + "/derep/bins2species" + config.get("samples_batch", "") + ".tsv",
         output:
-            mark=touch(BIN_RUN + "/derep/.drep.upload.done")
+            mark=touch(BIN_RUN + "/derep/.drep.upload" + config.get("samples_batch", "") + ".done")
         params:
             remote_dir=config.get("upload_tag","") + "binning/derep",
             config_dir="/tmp/bypy_drep"
@@ -218,7 +218,7 @@ if config.get("upload", False):
         resources:
             upload_slots=1,
         log:
-            "logs/binning/upload/drep.log"
+            "logs/binning/upload/drep" + config.get("samples_batch", "") + ".log"
         shell:
             """  
             mkdir -p {params.config_dir}  
@@ -236,9 +236,9 @@ if config.get("upload", False):
 
     rule upload_drep_report:
         input:
-            report=WORKDIR + "reports/bin_report_metabat.html"
+            report=WORKDIR + "reports/bin_report_metabat" + config.get("samples_batch", "") + ".html"
         output:
-            mark=touch(BIN_RUN + "/.drep_report_upload.done")
+            mark=touch(BIN_RUN + "/.drep_report_upload" + config.get("samples_batch", "") + ".done")
         params:
             remote_dir=config.get("upload_tag","") + "binning/report",
             config_dir="/tmp/bypy_drep_report"
@@ -247,30 +247,30 @@ if config.get("upload", False):
         resources:
             upload_slots=1,
         log:
-            "logs/binning/upload/drep_report.log"
+            "logs/binning/upload/drep_report" + config.get("samples_batch", "") + ".log"
         shell:
             """  
             mkdir -p {params.config_dir}  
             cp ~/.bypy/bypy.json {params.config_dir}/  
     
             bypy --config-dir {params.config_dir} mkdir {params.remote_dir} 2>> {log}  
-            bypy --config-dir {params.config_dir} upload {input.report} {params.remote_dir}/bin_report_metabat.html 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.report} {params.remote_dir}/ 2>> {log}  
     
             rm -rf {params.config_dir}  
             """
 
     rule finish_drep_with_upload:
         input:
-            drep_upload=BIN_RUN + "/derep/.drep.upload.done",
-            report_upload=BIN_RUN + "/.drep_report_upload.done"
+            drep_upload=BIN_RUN + "/derep/.drep.upload" + config.get("samples_batch", "") + ".done",
+            report_upload=BIN_RUN + "/.drep_report_upload" + config.get("samples_batch", "") + ".done"
         output:
-            touch(BIN_RUN + "/rule_drep.done")
+            touch(BIN_RUN + "/rule_drep" + config.get("samples_batch", "") + ".done")
 else:
     rule finish_drep:
         input:
-            workdir=BIN_RUN + "/derep/workdir",
-            bin_info=BIN_RUN + "/derep/bin_info.tsv",
-            bins2species=BIN_RUN + "/derep/bins2species.tsv",
-            report=WORKDIR + "reports/bin_report_metabat.html",
+            workdir=BIN_RUN + "/derep/workdir" + config.get("samples_batch", ""),
+            bin_info=BIN_RUN + "/derep/bin_info" + config.get("samples_batch", "") + ".tsv",
+            bins2species=BIN_RUN + "/derep/bins2species" + config.get("samples_batch", "") + ".tsv",
+            report=WORKDIR + "reports/bin_report_metabat" + config.get("samples_batch", "") + ".html",
         output:
-            touch(BIN_RUN + "/rule_drep.done")
+            touch(BIN_RUN + "/rule_drep" + config.get("samples_batch", "") + ".done")

@@ -41,12 +41,14 @@ path:
 samples:
   id: id.txt
 
+#samples_batch: _batch1 # 针对于必须分开的项目，一次运行的项目请注释
+
 dbs:
   human: ../../DB/hg37 # 注意检查
 
 database_dir: ../../DB # 注意检查
 
-upload: true
+upload: true # 是否要上传
 upload_tag: batch1/ # 不需要请注释掉
 
 host:

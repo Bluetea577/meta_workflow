@@ -311,12 +311,12 @@ rule combine_contig_stats:
         # mapping logs will be incomplete unless we wait on alignment to finish
         bams=expand(ASSE_RUN + "/megahit/{sra_run}/sequence_alignment/{sra_run}_sort.bam", sra_run=IDS),
     output:
-        combined_contig_stats=WORKDIR + "stats/combined_contig_stats.tsv",
-        mark= touch(WORKDIR + "stats/.combined_stats.done"),
+        combined_contig_stats=WORKDIR + "stats/combined_contig_stats" + config.get("samples_batch", "") + ".tsv",
+        mark= touch(WORKDIR + "stats/.combined_stats" + config.get("samples_batch", "") + ".done"),
     params:
         samples=IDS,
     log:
-        "logs/assembly/combine_contig_stats.log",
+        "logs/assembly/combine_contig_stats" + config.get("samples_batch", "") + ".log",
     script:
         "../scripts/combine_contig_stats.py"
 
@@ -324,15 +324,15 @@ rule combine_contig_stats:
 # log待调整
 rule build_assembly_report:
     input:
-        combined_contig_stats=WORKDIR + "stats/combined_contig_stats.tsv",
-        stats_done= WORKDIR + "stats/.combined_stats.done",
+        combined_contig_stats=WORKDIR + "stats/combined_contig_stats" + config.get("samples_batch", "") + ".tsv",
+        stats_done= WORKDIR + "stats/.combined_stats" + config.get("samples_batch", "") + ".done",
     output:
-        report=WORKDIR + "reports/assembly_report.html",
-        mark= touch(WORKDIR + "reports/.assembly_report.done"),
+        report=WORKDIR + "reports/assembly_report" + config.get("samples_batch", "") + ".html",
+        mark= touch(WORKDIR + "reports/.assembly_report" + config.get("samples_batch", "") + ".done"),
     conda:
         "../envs/report.yaml"
     log:
-        "logs/assembly/report.log",
+        "logs/assembly/report" + config.get("samples_batch", "") + ".log",
     script:
         "../scripts/assembly_report.py"
 
@@ -415,12 +415,12 @@ if config.get("upload", False):
 
     rule upload_assembly_report:
         input:
-            stats=WORKDIR + "stats/combined_contig_stats.tsv",
-            report=WORKDIR + "reports/assembly_report.html",
-            stats_done=WORKDIR + "stats/.combined_stats.done",
-            report_done=WORKDIR + "reports/.assembly_report.done"
+            stats=WORKDIR + "stats/combined_contig_stats" + config.get("samples_batch", "") + ".tsv",
+            report=WORKDIR + "reports/assembly_report" + config.get("samples_batch", "") + ".html",
+            stats_done=WORKDIR + "stats/.combined_stats" + config.get("samples_batch", "") + ".done",
+            report_done=WORKDIR + "reports/.assembly_report" + config.get("samples_batch", "") + ".done"
         output:
-            mark=touch(ASSE_RUN + "/.assembly_report_upload.done")
+            mark=touch(ASSE_RUN + "/.assembly_report_upload" + config.get("samples_batch", "") + ".done")
         params:
             remote_dir=config.get("upload_tag","") + "assembly/report",
             config_dir="/tmp/bypy_assembly_report"
@@ -429,7 +429,7 @@ if config.get("upload", False):
         resources:
             upload_slots=1,
         log:
-            "logs/assembly/upload_report.log"
+            "logs/assembly/upload_report" + config.get("samples_batch", "") + ".log"
         shell:
             """  
             mkdir -p {params.config_dir}  
@@ -445,15 +445,15 @@ if config.get("upload", False):
 
     rule finish_assembly_with_upload:
         input:
-            report_done = WORKDIR + "reports/.assembly_report.done",
+            report_done = WORKDIR + "reports/.assembly_report" + config.get("samples_batch", "") +".done",
             upload_done = expand(ASSE_RUN + "/megahit/{sra_run}/.{sra_run}.upload.done", sra_run=IDS),
-            report_upload_done = ASSE_RUN + "/.assembly_report_upload.done"
+            report_upload_done = ASSE_RUN + "/.assembly_report_upload" + config.get("samples_batch", "") + ".done"
         output:
-            touch(ASSE_RUN + "/rule_assembly.done")
+            touch(ASSE_RUN + "/rule_assembly" + config.get("samples_batch", "") + ".done")
 else:
     rule finish_assembly:
         input:
-            report_done=WORKDIR + "reports/.assembly_report.done",
+            report_done=WORKDIR + "reports/.assembly_report" + config.get("samples_batch", "") + ".done",
             contig_stat=expand(ASSE_RUN + "/megahit/{sra_run}/contig_stats/.contig_stats.done",sra_run=IDS),
         output:
-            touch(ASSE_RUN + "/rule_assembly.done")
+            touch(ASSE_RUN + "/rule_assembly" + config.get("samples_batch", "") + ".done")

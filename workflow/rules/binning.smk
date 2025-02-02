@@ -30,7 +30,7 @@ def get_metabat_sensitivity():
     if config["metabat"]["sensitivity"] == "sensitive":
         return 500
     else:
-        200
+        return 200
 
 rule metabat:
     input:
@@ -214,11 +214,11 @@ rule combine_checkm2:
             sra_run=IDS,
         )
     output:
-        bin_table=BIN_RUN + "/metabat/checkm2_quality_report.tsv",
+        bin_table=BIN_RUN + "/metabat/checkm2_quality_report" + config.get("samples_batch", "") + ".tsv",
     params:
         samples=IDS,
     log:
-        "logs/binning/metabat/combine_checkm2.log",
+        "logs/binning/metabat/combine_checkm2" + config.get("samples_batch", "") + ".log",
     script:
         "../scripts/combine_checkm2.py"
 
@@ -233,11 +233,11 @@ rule combine_gunc:
             sra_run=IDS,
         )
     output:
-        bin_table=BIN_RUN + "/metabat/gunc_quality_report.tsv",
+        bin_table=BIN_RUN + "/metabat/gunc_quality_report" + config.get("samples_batch", "") + ".tsv",
     params:
         samples=IDS,
     log:
-        "logs/binning/metabat/combine_gunc.log",
+        "logs/binning/metabat/combine_gunc" + config.get("samples_batch", "") + ".log",
     script:
         "../scripts/combine_gunc.py"
 
@@ -255,9 +255,9 @@ rule get_bin_filenames:
             sra_run=IDS,
         ),
     log:
-        "logs/binning/metabat/get_bin_filename.log",
+        "logs/binning/metabat/get_bin_filename" + config.get("samples_batch", "") + ".log",
     output:
-        filenames=BIN_RUN + "/metabat/bins_paths.tsv",
+        filenames=BIN_RUN + "/metabat/bins_paths" + config.get("samples_batch", "") + ".tsv",
     script:
         "../scripts/bin_filename.py"
 
@@ -276,7 +276,7 @@ rule all_contigs2bins:
             sra_run=IDS,
         )
     output:
-        temp(BIN_RUN + "/metabat/contigs2bins.tsv.gz"),
+        temp(BIN_RUN + "/metabat/contigs2bins" + config.get("samples_batch", "") + ".tsv.gz"),
     run:
         import gzip
 
@@ -318,11 +318,11 @@ rule combine_bin_stats:
             sra_run=IDS,
         ),
     output:
-        BIN_RUN + "/metabat/genome_stats.tsv",
+        BIN_RUN + "/metabat/genome_stats" + config.get("samples_batch", "") + ".tsv",
     params:
         samples=IDS,
     log:
-        "logs/binning/metabat/combine_stats.log",
+        "logs/binning/metabat/combine_stats" + config.get("samples_batch", "") + ".log",
     script:
         "../scripts/combine_bin_stats.py"
 
@@ -330,10 +330,10 @@ def quality_filter_bins_input(wildcards):
     "Specify input files for quality_filter_bins rule"
 
     input_files = dict(
-        paths=BIN_RUN + "/metabat/bins_paths.tsv",
-        stats=BIN_RUN + "/metabat/genome_stats.tsv",
-        quality=BIN_RUN + "/metabat/checkm2_quality_report.tsv",
-        gunc=BIN_RUN + "/metabat/gunc_quality_report.tsv",
+        paths=BIN_RUN + "/metabat/bins_paths" + config.get("samples_batch", "") + ".tsv",
+        stats=BIN_RUN + "/metabat/genome_stats" + config.get("samples_batch", "") + ".tsv",
+        quality=BIN_RUN + "/metabat/checkm2_quality_report" + config.get("samples_batch", "") + ".tsv",
+        gunc=BIN_RUN + "/metabat/gunc_quality_report" + config.get("samples_batch", "") + ".tsv",
     )
 
     # check if gunc is in config file
@@ -352,11 +352,11 @@ rule quality_filter_bins:
     input:
         unpack(quality_filter_bins_input),
     output:
-        info=BIN_RUN + "/metabat/filtered/filtered_bins_info.tsv",
-        paths=BIN_RUN + "/metabat/filtered/filtered_bins_paths.txt",
+        info=BIN_RUN + "/metabat/filtered/filtered_bins_info" + config.get("samples_batch", "") +".tsv",
+        paths=BIN_RUN + "/metabat/filtered/filtered_bins_paths" + config.get("samples_batch", "") + ".txt",
     threads: 1
     log:
-        "logs/binning/metabat/filter_bins.log",
+        "logs/binning/metabat/filter_bins" + config.get("samples_batch", "") + ".log",
     params:
         filter_criteria=config["genome_filter_criteria"],
     script:
@@ -413,15 +413,15 @@ if config.get("upload", False):
 
     rule upload_bin_report:
         input:
-            bins_paths=BIN_RUN + "/metabat/bins_paths.tsv",
-            checkm2_report=BIN_RUN + "/metabat/checkm2_quality_report.tsv",
-            gunc_report=BIN_RUN + "/metabat/gunc_quality_report.tsv" if config.get("filter_chimieric_bins",False) else [],
-            genome_stats=BIN_RUN + "/metabat/genome_stats.tsv",
-            contigs2bins=BIN_RUN + "/metabat/contigs2bins.tsv.gz",
-            filtered_info=BIN_RUN + "/metabat/filtered/filtered_bins_info.tsv",
-            filtered_paths=BIN_RUN + "/metabat/filtered/filtered_bins_paths.txt"
+            bins_paths=BIN_RUN + "/metabat/bins_paths" + config.get("samples_batch", "") + ".tsv",
+            checkm2_report=BIN_RUN + "/metabat/checkm2_quality_report" + config.get("samples_batch", "") + ".tsv",
+            gunc_report=BIN_RUN + "/metabat/gunc_quality_report" + config.get("samples_batch", "") + ".tsv" if config.get("filter_chimieric_bins",False) else [],
+            genome_stats=BIN_RUN + "/metabat/genome_stats" + config.get("samples_batch", "") + ".tsv",
+            contigs2bins=BIN_RUN + "/metabat/contigs2bins" + config.get("samples_batch", "") + ".tsv.gz",
+            filtered_info=BIN_RUN + "/metabat/filtered/filtered_bins_info" + config.get("samples_batch", "") +".tsv",
+            filtered_paths=BIN_RUN + "/metabat/filtered/filtered_bins_paths" + config.get("samples_batch", "") + ".txt"
         output:
-            mark=touch(BIN_RUN + "/.bin_report_upload.done")
+            mark=touch(BIN_RUN + "/.bin_report_upload" + config.get("samples_batch", "") + ".done")
         params:
             remote_dir=config.get("upload_tag","") + "binning/report",
             config_dir="/tmp/bypy_bins_report"
@@ -430,7 +430,7 @@ if config.get("upload", False):
         resources:
             upload_slots=1,
         log:
-            "logs/binning/upload_report.log"
+            "logs/binning/upload_report" + config.get("samples_batch", "") + ".log"
         shell:
             """  
             mkdir -p {params.config_dir}  
@@ -456,9 +456,9 @@ if config.get("upload", False):
     rule finish_binning_with_upload:
         input:
             upload_done=expand(BIN_RUN + "/metabat/{sra_run}/.{sra_run}.upload.done",sra_run=IDS),
-            report_upload_done=BIN_RUN + "/.bin_report_upload.done"
+            report_upload_done=BIN_RUN + "/.bin_report_upload" + config.get("samples_batch", "") + ".done"
         output:
-            touch(BIN_RUN + "/rule_binning.done")
+            touch(BIN_RUN + "/rule_binning" + config.get("samples_batch", "") + ".done")
 else:
     rule finish_binning:
         input:
@@ -469,15 +469,15 @@ else:
             cluster_attribution = expand(BIN_RUN + "/metabat/{sra_run}/cluster_attribution.tsv", sra_run=IDS),
             faa_dir = expand(BIN_RUN + "/metabat/{sra_run}/faa", sra_run=IDS),
             status = expand(BIN_RUN + "/metabat/{sra_run}/bin_status", sra_run=IDS),
-            bins_paths=BIN_RUN + "/metabat/bins_paths.tsv",
-            checkm2_reports=BIN_RUN + "/metabat/checkm2_quality_report.tsv",
-            gunc_reports=BIN_RUN + "/metabat/gunc_quality_report.tsv" if config.get("filter_chimieric_bins",False) else [],
-            genome_statses=BIN_RUN + "/metabat/genome_stats.tsv",
-            contigs2bins=BIN_RUN + "/metabat/contigs2bins.tsv.gz",
-            filtered_info=BIN_RUN + "/metabat/filtered/filtered_bins_info.tsv",
-            filtered_paths=BIN_RUN + "/metabat/filtered/filtered_bins_paths.txt",
+            bins_paths=BIN_RUN + "/metabat/bins_paths" + config.get("samples_batch", "") + ".tsv",
+            checkm2_reports=BIN_RUN + "/metabat/checkm2_quality_report" + config.get("samples_batch", "") + ".tsv",
+            gunc_reports=BIN_RUN + "/metabat/gunc_quality_report" + config.get("samples_batch", "") + ".tsv" if config.get("filter_chimieric_bins",False) else [],
+            genome_statses=BIN_RUN + "/metabat/genome_stats" + config.get("samples_batch", "") + ".tsv",
+            contigs2bins=BIN_RUN + "/metabat/contigs2bins" + config.get("samples_batch", "") + ".tsv.gz",
+            filtered_info=BIN_RUN + "/metabat/filtered/filtered_bins_info" + config.get("samples_batch", "") +".tsv",
+            filtered_paths=BIN_RUN + "/metabat/filtered/filtered_bins_paths" + config.get("samples_batch", "") + ".txt",
         output:
-            touch(BIN_RUN + "/rule_binning.done")
+            touch(BIN_RUN + "/rule_binning" + config.get("samples_batch", "") + ".done")
 
 
 # rule build_bin_report:

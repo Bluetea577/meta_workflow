@@ -33,11 +33,11 @@ rule gtdbtk_db_preparation:
 
 rule gtdbtk_classify_wf:
     input:
-        genome_dir=BIN_RUN + "/derep/workdir/dereplicated_genomes",
+        genome_dir=BIN_RUN + "/derep/workdir" + config.get("samples_batch", "") + "/dereplicated_genomes",
         db_ready=DBDIR + "/gtdb_r220/.db_extract_complete",
     output:
-        directory=directory(GTDB_DIR),
-        marker=touch(GTDB_DIR + "/.gtdbtk_complete"),
+        directory=directory(GTDB_DIR + config.get("samples_batch", "")),
+        marker=touch(GTDB_DIR + config.get("samples_batch", "") + "/.gtdbtk_complete"),
     params:
         extension=".fasta",
         gtdb_database_path=DBDIR + "/gtdb_r220",
@@ -49,9 +49,9 @@ rule gtdbtk_classify_wf:
     conda:
         "../envs/gtdbtk.yaml"
     log:
-        "logs/gtdbtk/gtdbtk_classify.log"
+        "logs/gtdbtk/gtdbtk_classify" + config.get("samples_batch", "") + ".log"
     benchmark:
-        "logs/benchmarks/gtdbtk/gtdbtk_classify.tsv"
+        "logs/benchmarks/gtdbtk/gtdbtk_classify" + config.get("samples_batch", "") + ".tsv"
     shell:
         """  
         mkdir -p {output.directory}  
@@ -88,18 +88,18 @@ rule gtdbtk_infer:
 
 rule fasttree_phylogeny:
     input:
-        flags=GTDB_DIR + "/.gtdbtk_complete",
+        flags=GTDB_DIR + config.get("samples_batch", "") + "/.gtdbtk_complete",
     output:
-        tree=GTDB_DIR + "/phylogeny/fasttree.nwk",
+        tree=GTDB_DIR + config.get("samples_batch", "") + "/phylogeny/fasttree.nwk",
     params:
-        input_msa=GTDB_DIR + "/align/gtdbtk_result.bac120.user_msa.fasta.gz",
+        input_msa=GTDB_DIR + config.get("samples_batch", "") + "/align/gtdbtk_result.bac120.user_msa.fasta.gz",
         outdir=lambda wc, output: os.path.dirname(output.tree),
     threads: 16
     resources:
         mem_mb=3500 * 8,
         time_min=60 * 6
     log:
-        "logs/phylogeny/fasttree.log"
+        "logs/phylogeny/fasttree" + config.get("samples_batch", "") + ".log"
     conda:
         "../envs/fasttree.yaml"
     shell:
@@ -123,11 +123,11 @@ if config.get("upload", False):
     rule upload_gtdbtk:
         """上传GTDB-Tk分析结果"""
         input:
-            gtdbtk_dir=GTDB_DIR,
-            classify_done=GTDB_DIR + "/.gtdbtk_complete",
-            tree=GTDB_DIR + "/phylogeny/fasttree.nwk"
+            gtdbtk_dir=GTDB_DIR + config.get("samples_batch", ""),
+            classify_done=GTDB_DIR + config.get("samples_batch", "") + "/.gtdbtk_complete",
+            tree=GTDB_DIR + config.get("samples_batch", "") + "/phylogeny/fasttree.nwk"
         output:
-            mark=touch(GTDB_DIR + "/.upload_complete")
+            mark=touch(GTDB_DIR + config.get("samples_batch", "") + "/.upload_complete")
         params:
             remote_dir=config.get("upload_tag","") + "taxonomy/gtdbtk",
             config_dir="/tmp/bypy_gtdbtk"
@@ -137,7 +137,7 @@ if config.get("upload", False):
             upload_slots=1,
         # retries: 3
         log:
-            "logs/gtdbtk/upload.log"
+            "logs/gtdbtk/upload" + config.get("samples_batch", "") + ".log"
         shell:
             """  
             mkdir -p {params.config_dir}  
@@ -155,15 +155,15 @@ if config.get("upload", False):
     rule finish_gtdbtk_with_upload:
         """标记GTDB-Tk分析完成"""
         input:
-            upload=GTDB_DIR + "/.upload_complete",
+            upload=GTDB_DIR + config.get("samples_batch", "") + "/.upload_complete",
         output:
-            touch(GTDB_DIR + "/rule_gtdbtk.done")
+            touch(GTDB_DIR + config.get("samples_batch", "") + "/rule_gtdbtk.done")
 
 else:
     rule finish_gtdbtk:
         input:
-            gtdbtk_dir = GTDB_DIR,
-            classify=GTDB_DIR + "/.gtdbtk_complete",
-            tree=GTDB_DIR + "/phylogeny/fasttree.nwk",
+            gtdbtk_dir = GTDB_DIR + config.get("samples_batch", ""),
+            classify=GTDB_DIR + config.get("samples_batch", "") + "/.gtdbtk_complete",
+            tree=GTDB_DIR + config.get("samples_batch", "") + "/phylogeny/fasttree.nwk",
         output:
-            touch(GTDB_DIR + "/rule_gtdbtk.done")
+            touch(GTDB_DIR + config.get("samples_batch", "") + "/rule_gtdbtk.done")

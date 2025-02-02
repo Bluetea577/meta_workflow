@@ -278,7 +278,7 @@ if config.get("upload", False):
         input:
             upload_marks=expand(CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.uploaded",sra_run=IDS)
         output:
-            touch(CLEAN_RUN + "/rule_clean_data.done")
+            touch(CLEAN_RUN + "/rule_clean_data" + config.get("samples_batch", "") + ".done")
 else:
     rule finish_clean_data:
         input:
@@ -286,7 +286,7 @@ else:
             stats = expand(CLEAN_RUN + "/{sra_run}/{sra_run}.tsv", sra_run=IDS),
             clean_done = expand(CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.done", sra_run=IDS),
         output:
-            touch(CLEAN_RUN + "/rule_clean_data.done")
+            touch(CLEAN_RUN + "/rule_clean_data" + config.get("samples_batch", "") + ".done")
 
 
     # run:

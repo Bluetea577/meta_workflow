@@ -3,15 +3,15 @@ PROKKA_DIR = os.path.join(WORKDIR,config["path"]["prokka_path"])
 # Prokka注释单个基因组
 rule prokka_annotation:
     input:
-        genome=BIN_RUN + "/derep/workdir/dereplicated_genomes/{genome}.fasta"
+        genome=BIN_RUN + "/derep/workdir" + config.get("samples_batch", "") + "/dereplicated_genomes/{genome}.fasta"
     output:
-        gff=PROKKA_DIR + "/{genome}/annotation.gff",
-        faa=PROKKA_DIR + "/{genome}/annotation.faa",
-        ffn=PROKKA_DIR + "/{genome}/annotation.ffn",
-        gbk=PROKKA_DIR + "/{genome}/annotation.gbk",
-        tsv=PROKKA_DIR + "/{genome}/annotation.tsv"
+        gff=PROKKA_DIR + config.get("samples_batch", "") + "/{genome}/annotation.gff",
+        faa=PROKKA_DIR + config.get("samples_batch", "") + "/{genome}/annotation.faa",
+        ffn=PROKKA_DIR + config.get("samples_batch", "") + "/{genome}/annotation.ffn",
+        gbk=PROKKA_DIR + config.get("samples_batch", "") + "/{genome}/annotation.gbk",
+        tsv=PROKKA_DIR + config.get("samples_batch", "") + "/{genome}/annotation.tsv"
     params:
-        outdir=PROKKA_DIR + "/{genome}",
+        outdir=PROKKA_DIR + config.get("samples_batch", "") + "/{genome}",
         prefix="annotation",
         kingdom="Bacteria",# or "Archaea"
         locustag="{genome}",
@@ -22,7 +22,7 @@ rule prokka_annotation:
         mem_mb=3500 * 16,
         time_min=30
     log:
-        "logs/prokka/{genome}.log"
+        "logs/prokka" + config.get("samples_batch", "") + "/{genome}.log"
     conda:
         "../envs/prokka.yaml"
     shell:
@@ -48,9 +48,9 @@ localrules:
 # 获取derep后的基因组列表
 checkpoint get_derep_genomes:
     input:
-        derep_dir=BIN_RUN + "/derep/workdir/dereplicated_genomes"
+        derep_dir=BIN_RUN + "/derep/workdir" + config.get("samples_batch", "") + "/dereplicated_genomes"
     output:
-        genome_list=PROKKA_DIR + "/genome_list.txt"
+        genome_list=PROKKA_DIR + config.get("samples_batch", "") + "/genome_list.txt"
     shell:
         """  
         mkdir -p $(dirname {output.genome_list})  
@@ -69,7 +69,7 @@ def get_prokka_input(wildcards):
     checkpoint_output = checkpoints.get_derep_genomes.get(**wildcards).output[0]
     with open(checkpoint_output) as f:
         genomes = [line.strip() for line in f]
-    return expand(PROKKA_DIR + "/{genome}/annotation.{ext}",
+    return expand(PROKKA_DIR + config.get("samples_batch", "") + "/{genome}/annotation.{ext}",
         genome=genomes,
         ext=["faa", "ffn", "tsv"])
 
@@ -79,13 +79,13 @@ rule combine_prokka_results:
     input:
         annotations=get_prokka_input
     output:
-        combined_faa=PROKKA_DIR + "/all_proteins.faa",
-        combined_ffn=PROKKA_DIR + "/all_genes.ffn",
-        combined_tsv=PROKKA_DIR + "/all_annotations.tsv"
+        combined_faa=PROKKA_DIR + config.get("samples_batch", "") + "/all_proteins.faa",
+        combined_ffn=PROKKA_DIR + config.get("samples_batch", "") + "/all_genes.ffn",
+        combined_tsv=PROKKA_DIR + config.get("samples_batch", "") + "/all_annotations.tsv"
     params:
-        prokka_dir=PROKKA_DIR
+        prokka_dir=PROKKA_DIR + config.get("samples_batch", "")
     log:
-        "logs/prokka/combine_results.log"
+        "logs/prokka" + config.get("samples_batch", "") + "/combine_results.log"
     shell:
         """  
         mkdir -p $(dirname {output.combined_faa})  
@@ -115,15 +115,15 @@ rule combine_prokka_results:
 # 统计注释结果
 rule prokka_stats:
     input:
-        combined_tsv=PROKKA_DIR + "/all_annotations.tsv"
+        combined_tsv=PROKKA_DIR + config.get("samples_batch", "") + "/all_annotations.tsv"
     output:
-        stats=PROKKA_DIR + "/annotation_statistics.txt"
+        stats=PROKKA_DIR + config.get("samples_batch", "") + "/annotation_statistics.txt"
     threads: 2
     resources:
         mem_mb=3500 * 2,
         time_min=30
     log:
-        "logs/prokka/stats.log"
+        "logs/prokka" + config.get("samples_batch", "") + "/stats.log"
     script:
         "../scripts/summarize_prokka.py"
 
@@ -135,15 +135,15 @@ if config.get("upload", False):
     rule upload_prokka:
         """上传Prokka注释结果"""
         input:
-            combined_faa=PROKKA_DIR + "/all_proteins.faa",
-            combined_ffn=PROKKA_DIR + "/all_genes.ffn",
-            combined_tsv=PROKKA_DIR + "/all_annotations.tsv",
-            stats=PROKKA_DIR + "/annotation_statistics.txt"
+            combined_faa=PROKKA_DIR + config.get("samples_batch", "") + "/all_proteins.faa",
+            combined_ffn=PROKKA_DIR + config.get("samples_batch", "") + "/all_genes.ffn",
+            combined_tsv=PROKKA_DIR + config.get("samples_batch", "") + "/all_annotations.tsv",
+            stats=PROKKA_DIR + config.get("samples_batch", "") + "/annotation_statistics.txt"
         output:
-            mark=touch(PROKKA_DIR + "/.upload_complete")
+            mark=touch(PROKKA_DIR + config.get("samples_batch", "") + "/.upload_complete")
         params:
-            remote_dir=config.get("upload_tag","") + "annotation/prokka",
-            prokka_dir=PROKKA_DIR,
+            remote_dir=config.get("upload_tag","") + "annotation/prokka" + config.get("samples_batch", ""),
+            prokka_dir=PROKKA_DIR + config.get("samples_batch", ""),
             config_dir="/tmp/bypy_prokka"
         conda:
             "../envs/baiduyun.yaml"
@@ -151,7 +151,7 @@ if config.get("upload", False):
             upload_slots=1,
         # retries: 3
         log:
-            "logs/prokka/upload.log"
+            "logs/prokka" + config.get("samples_batch", "") + "/upload.log"
         shell:
             """  
             mkdir -p {params.config_dir}  
@@ -181,16 +181,16 @@ if config.get("upload", False):
     rule finish_prokka_with_upload:
         """标记Prokka注释完成"""
         input:
-            upload=PROKKA_DIR + "/.upload_complete"
+            upload=PROKKA_DIR + config.get("samples_batch", "") + "/.upload_complete"
         output:
-            touch(PROKKA_DIR + "/rule_prokka.done")
+            touch(PROKKA_DIR + config.get("samples_batch", "") + "/rule_prokka.done")
 
 else:
     rule finish_prokka:
         input:
-            combined_faa=PROKKA_DIR + "/all_proteins.faa",
-            combined_ffn=PROKKA_DIR + "/all_genes.ffn",
-            combined_tsv=PROKKA_DIR + "/all_annotations.tsv",
-            stats=PROKKA_DIR + "/annotation_statistics.txt",
+            combined_faa=PROKKA_DIR + config.get("samples_batch", "") + "/all_proteins.faa",
+            combined_ffn=PROKKA_DIR + config.get("samples_batch", "") + "/all_genes.ffn",
+            combined_tsv=PROKKA_DIR + config.get("samples_batch", "") + "/all_annotations.tsv",
+            stats=PROKKA_DIR + config.get("samples_batch", "") + "/annotation_statistics.txt",
         output:
-            touch(PROKKA_DIR + "/rule_prokka.done")
+            touch(PROKKA_DIR + config.get("samples_batch", "") + "/rule_prokka.done")

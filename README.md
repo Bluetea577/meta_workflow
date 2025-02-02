@@ -11,7 +11,8 @@ This Snakemake workflow is designed for processing metagenomic sequencing data, 
 1. modify config.yaml
 	-	path.user_root
 	-	path.meta_path
-	-	samples
+	-	samples.id
+	-	samples_batch
 	-	dbs.human
 	-	database_dir
 	-	host
