@@ -134,6 +134,7 @@ rule align_reads_to_contigs:
     params:
         ref_out=lambda wc, output: os.path.dirname(output[0]),
         input=lambda wc, input: get_align_input(input),
+        tmp_prefix= lambda wc,output: os.path.join(os.path.dirname(output[0]),wc.sra_run),
     benchmark:
         "logs/benchmarks/assembly/align/{sra_run}.tsv"
     log:
@@ -160,6 +161,7 @@ rule align_reads_to_contigs:
         | samtools sort \
         -O bam \
         --threads {threads} \
+        -T {params.tmp_prefix} \
         -o - > {output} \
         2>> {log}
         
