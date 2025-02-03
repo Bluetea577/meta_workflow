@@ -179,6 +179,8 @@ rule kneaddata_process:
         "../envs/kneaddata.yaml"
     shell:
         """
+        rm -rf {params.outdir}
+        
         export PATH=$CONDA_PREFIX/share/trimmomatic-0.39-2:$PATH
         
         kneaddata \
