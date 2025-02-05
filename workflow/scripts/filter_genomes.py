@@ -78,7 +78,7 @@ def process_quality_and_stats(quality_file, stats_file):
 
 def apply_gunc_filter(Q, gunc_file):
     gunc = pd.read_table(gunc_file, index_col=0)
-    gunc = gunc.loc[Q.index]
+    # gunc = gunc.loc[Q.index]
 
     bad_genomes = gunc.index[gunc["pass.GUNC"] == False]
     logging.info(f"{len(bad_genomes)} Don't pass gunc filtering")

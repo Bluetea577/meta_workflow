@@ -101,9 +101,23 @@ def parse_map_stats(sample_data, out_tsv):
     return stats_df
 
 
-def main(samples, contig_stats, gene_tables, mapping_logs, combined_stats):
-    sample_data = {}
+def main(samples, contig_stats, gene_tables, mapping_logs, status_files, combined_stats):
+    valid_samples = []
     for sample in samples:
+        for status_file in status_files:
+            if f"{sample}/" in status_file:
+                with open(status_file) as f:
+                    if f.read().strip() != "empty":
+                        valid_samples.append(sample)
+                break
+
+    if not valid_samples:
+        with open(combined_stats, 'w') as f:
+            f.write("Sample\tN_Predicted_Genes\tAssembled_Reads\tPercent_Assembled_Reads\n")
+        return
+
+    sample_data = {}
+    for sample in valid_samples:
         sample_data[sample] = {}
         for c_stat in contig_stats:
             # underscore version was for simplified local testing
@@ -128,5 +142,6 @@ if __name__ == "__main__":
         contig_stats=snakemake.input.contig_stats,
         gene_tables=snakemake.input.gene_tables,
         mapping_logs=snakemake.input.mapping_logs,
+        status_files=snakemake.input.status,
         combined_stats=snakemake.output.combined_contig_stats,
     )

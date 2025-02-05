@@ -1,3 +1,5 @@
+BIN_RUN = os.path.join(WORKDIR, config["path"]["binning_path"]) # 单独使用增加
+
 rule quality_file:
     input:
         BIN_RUN + "/metabat/filtered/filtered_bins_info" + config.get("samples_batch", "") +".tsv",

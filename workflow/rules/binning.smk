@@ -19,11 +19,16 @@ rule get_metabat_depth:
         minid = lambda wc, input: (
             config["cobinning_readmapping_id"] * 100 if len(input) > 1 else 97
         ),
+        contigs_status = ASSE_RUN + "/megahit/{sra_run}/assembly_status",
     shell:
         """
-        jgi_summarize_bam_contig_depths \
-        --outputDepth {output} \
-        {input} &> {log}
+        if [ -f {params.contigs_status} ] && [ "$(cat {params.contigs_status})" = "empty" ]; then  
+            touch {output}  
+        else  
+            jgi_summarize_bam_contig_depths \
+            --outputDepth {output} \
+            {input} &> {log}  
+        fi
         """
 
 def get_metabat_sensitivity():
@@ -41,6 +46,7 @@ rule metabat:
     params:
         min_contig_len = config["metabat"]["min_contig_length"],
         sensitivity=get_metabat_sensitivity(),
+        contigs_status= ASSE_RUN + "/megahit/{sra_run}/assembly_status",
     log:
         "logs/binning/metabat/{sra_run}_metabat.log",
     benchmark:
@@ -52,16 +58,20 @@ rule metabat:
         mem_mb=config["mem"] * 1000
     shell:
         """
-        metabat2 \
-        -i {input.fasta} \
-        --abdFile {input.depth_file} \
-        --minContig {params.min_contig_len} \
-        --numThreads {threads} \
-        --maxEdges {params.sensitivity} \
-        --saveCls \
-        --noBinOut \
-        -o {output.clsfile} \
-        &> {log}
+        if [ -f {params.contigs_status} ] && [ "$(cat {params.contigs_status})" = "empty" ]; then  
+            touch {output.clsfile}  
+        else 
+            metabat2 \
+            -i {input.fasta} \
+            --abdFile {input.depth_file} \
+            --minContig {params.min_contig_len} \
+            --numThreads {threads} \
+            --maxEdges {params.sensitivity} \
+            --saveCls \
+            --noBinOut \
+            -o {output.clsfile} \
+            &> {log}
+        fi
         """
 
 rule get_unique_cluster_attribution:

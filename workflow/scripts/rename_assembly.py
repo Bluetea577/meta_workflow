@@ -36,11 +36,13 @@ with open(snakemake.output.fasta, "w") as output_handle, open(
     snakemake.output.mapping_table, "w"
 ) as mapping_table_handle:
     i = 1
+    valid_contigs = False
 
     for record in SeqIO.parse(snakemake.input[0], "fasta"):
         if len(record) < snakemake.params.minlength:
             continue
 
+        valid_contigs = True
         old_name = record.id
         new_name = f"{snakemake.wildcards.sra_run}_{i}"
         record.id = new_name
@@ -51,3 +53,6 @@ with open(snakemake.output.fasta, "w") as output_handle, open(
         mapping_table_handle.write(f"{new_name}\t{old_name}\n")
 
         i += 1
+
+with open(snakemake.output.status, "w") as status_handle:
+    status_handle.write("valid" if valid_contigs else "empty")

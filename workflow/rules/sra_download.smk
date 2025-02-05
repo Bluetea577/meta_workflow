@@ -68,11 +68,22 @@ rule download_data:
     threads: 1,
     shell:
         """
+        rm -rf {params.outdir}
+        
         kingfisher get -r {wildcards.sra_run} \
             -m ena-ftp aws-http \
             -f fastq.gz \
             -t {threads} \
             --output-directory {params.outdir} 2> {log}
+        
+        # pigz过于消耗资源时使用
+        # kingfisher get -r {wildcards.sra_run} \
+        #     -m ena-ftp aws-http \
+        #     --output-directory {params.outdir} 2> {log}  
+        # 
+        # if [ -f {params.outdir}/*.fastq ]; then  
+        #     gzip {params.outdir}/*.fastq  
+        # fi 
         """
 
 """

@@ -75,6 +75,7 @@ rule rename_contigs:
     output:
         fasta=temp(ASSE_RUN + "/megahit/{sra_run}/{sra_run}_prefilter_contigs.fasta"),
         mapping_table=ASSE_RUN + "/megahit/{sra_run}/old2new_contig_names.tsv",
+        status=ASSE_RUN + "/megahit/{sra_run}/assembly_status",
     threads: config.get("simplejob_threads", 1)
     resources:
         mem_mb=config["simplejob_mem"] * 1000,
@@ -129,6 +130,7 @@ rule align_reads_to_contigs:
     input:
         query=expand(CLEAN_RUN + "/{{sra_run}}/{{sra_run}}_kneaddata{frac}.fastq.gz", frac = Sra_frac),
         target=ASSE_RUN + "/megahit/{sra_run}/{sra_run}_final_contigs.fasta",
+        status=ASSE_RUN + "/megahit/{sra_run}/assembly_status",
     output:
         ASSE_RUN + "/megahit/{sra_run}/sequence_alignment/{sra_run}_sort.bam",
     params:
@@ -146,27 +148,31 @@ rule align_reads_to_contigs:
         mem_mb=config["mem"] * 1000,
     shell:
         """
-        echo "Starting index building..." 2> {log} 
-        bowtie2-build \
-        --threads {threads} \
-        -f {input.target} \
-        {params.ref_out}/index \
-        2>> {log}
-        
-        echo "Starting alignment and sorting..." 2>> {log} 
-        bowtie2 \
-        --threads {threads} \
-        -x {params.ref_out}/index \
-        {params.input} \
-        | samtools sort \
-        -O bam \
-        --threads {threads} \
-        -T {params.tmp_prefix} \
-        -o - > {output} \
-        2>> {log}
-        
-        echo "Cleaning up index files..." 2>> {log}  
-        rm -f {params.ref_out}/*.bt2 2>> {log}
+        if [ $(cat {input.status}) = "empty" ]; then
+            touch {output} 2> {log}
+        else
+            echo "Starting index building..." 2> {log} 
+            bowtie2-build \
+            --threads {threads} \
+            -f {input.target} \
+            {params.ref_out}/index \
+            2>> {log}
+            
+            echo "Starting alignment and sorting..." 2>> {log} 
+            bowtie2 \
+            --threads {threads} \
+            -x {params.ref_out}/index \
+            {params.input} \
+            | samtools sort \
+            -O bam \
+            --threads {threads} \
+            -T {params.tmp_prefix} \
+            -o - > {output} \
+            2>> {log}
+            
+            echo "Cleaning up index files..." 2>> {log}  
+            rm -f {params.ref_out}/*.bt2 2>> {log}
+        fi
         """
 
 rule pileup_contigs_sample:
@@ -174,6 +180,7 @@ rule pileup_contigs_sample:
         fasta=ASSE_RUN + "/megahit/{sra_run}/{sra_run}_final_contigs.fasta",
         bam=ASSE_RUN + "/megahit/{sra_run}/sequence_alignment/{sra_run}_sort.bam",
         bai=ASSE_RUN + "/megahit/{sra_run}/sequence_alignment/{sra_run}_sort.bam.bai",
+        status=ASSE_RUN + "/megahit/{sra_run}/assembly_status",
     output:
         covhist=ASSE_RUN + "/megahit/{sra_run}/contig_stats/postfilter_coverage_histogram.txt",
         covstats=ASSE_RUN + "/megahit/{sra_run}/contig_stats/postfilter_coverage_stats.txt",
@@ -197,22 +204,32 @@ rule pileup_contigs_sample:
         mem_mb=config["mem"] * 1000,
         java_mem=int(config["mem"] * JAVA_MEM_FRACTION),
     shell:
-        "pileup.sh "
-        " ref={input.fasta} "
-        " in={input.bam} "
-        " threads={threads} "
-        " -Xmx{resources.java_mem}G "
-        " out={output.covstats} "
-        " hist={output.covhist} "
-        " concise=t "
-        " minmapq={params.minmapq} "
-        " secondary={params.pileup_secondary} "
-        " bincov={output.bincov} "
-        " 2> {log} "
+        """  
+        if [ $(cat {input.status}) = "empty" ]; then  
+            # 创建空文件  
+            touch {output.covhist}  
+            touch {output.covstats}  
+            touch {output.bincov}  
+        else  
+            pileup.sh \
+            ref={input.fasta} \
+            in={input.bam} \
+            threads={threads} \
+            -Xmx{resources.java_mem}G \
+            out={output.covstats} \
+            hist={output.covhist} \
+            concise=t \
+            minmapq={params.minmapq} \
+            secondary={params.pileup_secondary} \
+            bincov={output.bincov} \
+            2> {log}  
+        fi  
+        """
 
 rule create_bam_index:
     input:
-        ASSE_RUN + "/megahit/{sra_run}/sequence_alignment/{sra_run}_sort.bam",
+        bam=ASSE_RUN + "/megahit/{sra_run}/sequence_alignment/{sra_run}_sort.bam",
+        status=ASSE_RUN + "/megahit/{sra_run}/assembly_status",
     output:
         ASSE_RUN + "/megahit/{sra_run}/sequence_alignment/{sra_run}_sort.bam.bai",
     conda:
@@ -223,11 +240,18 @@ rule create_bam_index:
     resources:
         mem_mb=8000,
     shell:
-        "samtools index {input} 2> {log}"
+        """
+        if [ $(cat {input.status}) = "empty" ]; then  
+            touch {output}  
+        else  
+            samtools index {input.bam} 2> {log}  
+        fi
+        """
 
 rule predict_genes:
     input:
-        ASSE_RUN + "/megahit/{sra_run}/{sra_run}_final_contigs.fasta",
+        fasta=ASSE_RUN + "/megahit/{sra_run}/{sra_run}_final_contigs.fasta",
+        status=ASSE_RUN + "/megahit/{sra_run}/assembly_status",
     output:
         fna=temp(ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.fna"),
         faa=temp(ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.faa"),
@@ -244,8 +268,14 @@ rule predict_genes:
         time_min=60 * config["runtime"]["simplejob"],
     shell:
         """
-        prodigal -i {input} -o {output.gff} -d {output.fna} \
-            -a {output.faa} -p meta -f gff 2> {log}
+        if [ $(cat {input.status}) = "empty" ]; then  
+            touch {output.fna}  
+            touch {output.faa}  
+            touch {output.gff}
+        else
+            prodigal -i {input} -o {output.gff} -d {output.fna} \
+                -a {output.faa} -p meta -f gff 2> {log}
+        fi
         """
 
 localrules:
@@ -312,6 +342,7 @@ rule combine_contig_stats:
         ),
         # mapping logs will be incomplete unless we wait on alignment to finish
         bams=expand(ASSE_RUN + "/megahit/{sra_run}/sequence_alignment/{sra_run}_sort.bam", sra_run=IDS),
+        status=expand(ASSE_RUN + "/megahit/{sra_run}/assembly_status",sra_run=IDS),
     output:
         combined_contig_stats=WORKDIR + "stats/combined_contig_stats" + config.get("samples_batch", "") + ".tsv",
         mark= touch(WORKDIR + "stats/.combined_stats" + config.get("samples_batch", "") + ".done"),
@@ -364,6 +395,7 @@ if config.get("upload", False):
                 ASSE_RUN + "/predicted_genes/{sra_run}/{sra_run}.tsv",
             ],
             clean_flags = CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.uploaded",
+            status=ASSE_RUN + "/megahit/{sra_run}/assembly_status",
         output:
             mark = touch(ASSE_RUN + "/megahit/{sra_run}/.{sra_run}.upload.done")
         params:
@@ -394,6 +426,7 @@ if config.get("upload", False):
             bypy --config-dir {params.config_dir} upload {input.contigs} {params.remote_dir}/ 2>> {log}  
             bypy --config-dir {params.config_dir} upload {input.stats} {params.remote_dir}/ 2>> {log}  
             bypy --config-dir {params.config_dir} upload {input.mapping} {params.remote_dir}/ 2>> {log}  
+            bypy --config-dir {params.config_dir} upload {input.status} {params.remote_dir}/ 2>> {log}  
             bypy --config-dir {params.config_dir} upload {input.bam} {params.remote_dir}/sequence_alignment/ 2>> {log}  
             bypy --config-dir {params.config_dir} upload {input.bai} {params.remote_dir}/sequence_alignment/ 2>> {log}  
     
