@@ -273,7 +273,7 @@ rule predict_genes:
             touch {output.faa}  
             touch {output.gff}
         else
-            prodigal -i {input} -o {output.gff} -d {output.fna} \
+            prodigal -i {input.fasta} -o {output.gff} -d {output.fna} \
                 -a {output.faa} -p meta -f gff 2> {log}
         fi
         """
