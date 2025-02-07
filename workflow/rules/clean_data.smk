@@ -157,7 +157,7 @@ def hostdb(wildcards):
 
 rule kneaddata_process:
     input:
-        fastqs=expand(SRA_RUN + "/{{sra_run}}/{{sra_run}}{frac}.fastq.gz", frac = Sra_frac),
+        fastqs=expand(SRA_RUN + "/{{sra_run}}/{{sra_run}}{frac}.fastq", frac = Sra_frac),
         sra_done=SRA_RUN + "/{sra_run}/.{sra_run}.sra_download.done",
     output:
         temp(expand(CLEAN_RUN + "/{{sra_run}}_temp/{{sra_run}}_kneaddata{frac}.fastq.gz", frac = Sra_frac)),

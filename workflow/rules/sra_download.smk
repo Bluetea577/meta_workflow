@@ -50,7 +50,7 @@ localrules:
 rule download_data:
     output:
         fastqs = temp(expand(
-            SRA_RUN + "/{{sra_run}}/{{sra_run}}{frac}.fastq.gz",
+            SRA_RUN + "/{{sra_run}}/{{sra_run}}{frac}.fastq",
             frac=Sra_frac
         )),
         mark = touch(SRA_RUN + "/{sra_run}/.{sra_run}.sra_download.done"),
@@ -74,7 +74,7 @@ rule download_data:
         
         kingfisher get -r {wildcards.sra_run} \
             -m {params.method} \
-            -f fastq.gz \
+            -f fastq \
             -t {threads} \
             {params.ascp_args} \
             --output-directory {params.outdir} 2> {log}
