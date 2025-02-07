@@ -60,17 +60,35 @@ def kneaddata_input(input):
 #
 #     return out.strip()
 
-def gzip_item(wildcards, input, output):
+# def gzip_item(wildcards, input, output):
+#     # 对应修改rule：gzipitem = lambda wc, input, output: gzip_item(wc,input.fastqs,output),
+#     Nfiles = len(input)
+#     outdir = os.path.dirname(output[0])
+#     if Nfiles == 1:
+#         out = f"""
+#         gzip -1 {outdir}/{wildcards.sra_run}_kneaddata.fastq
+#         """
+#     else:
+#         out = f"""
+#         gzip -1 {outdir}/{wildcards.sra_run}_1_kneaddata_paired_1.fastq
+#         gzip -1 {outdir}/{wildcards.sra_run}_1_kneaddata_paired_2.fastq
+#         """
+#
+#     return out.strip()
+
+# 资源利用更加充分的压缩方法：
+def gzip_item(wildcards, input, output, threads):
+    # 对应修改rule：gzipitem = lambda wc, input, output, threads: gzip_item(wc,input.fastqs,output, threads),
     Nfiles = len(input)
     outdir = os.path.dirname(output[0])
     if Nfiles == 1:
         out = f"""
-        gzip -1 {outdir}/{wildcards.sra_run}_kneaddata.fastq
+        pigz -p {threads} {outdir}/{wildcards.sra_run}_kneaddata.fastq
         """
     else:
         out = f"""
-        gzip -1 {outdir}/{wildcards.sra_run}_1_kneaddata_paired_1.fastq
-        gzip -1 {outdir}/{wildcards.sra_run}_1_kneaddata_paired_2.fastq
+        pigz -p {threads} {outdir}/{wildcards.sra_run}_1_kneaddata_paired_1.fastq
+        pigz -p {threads} {outdir}/{wildcards.sra_run}_1_kneaddata_paired_2.fastq
         """
 
     return out.strip()
@@ -165,7 +183,7 @@ rule kneaddata_process:
         inputs = lambda wc, input: kneaddata_input(input.fastqs),
         outdir=CLEAN_RUN + "/{sra_run}_temp",
         trimopt=config["kneaddata_opt"]["trimmomatic"],
-        gzipitem = lambda wc, input, output: gzip_item(wc,input.fastqs,output),
+        gzipitem = lambda wc, input, output, threads: gzip_item(wc,input.fastqs,output, threads),
         renameitem = lambda wc, input, output: rename_item(wc,input.fastqs,output),
         dbs=lambda wc: hostdb(wc),
     log:
@@ -284,7 +302,7 @@ if config.get("upload", False):
 else:
     rule finish_clean_data:
         input:
-            fastqs = expand(CLEAN_RUN + "/{{sra_run}}/{{sra_run}}_kneaddata{frac}.fastq.gz",frac=Sra_frac),
+            fastqs = expand(CLEAN_RUN + "/{sra_run}/{sra_run}_kneaddata{frac}.fastq.gz", sra_run=IDS, frac=Sra_frac),
             stats = expand(CLEAN_RUN + "/{sra_run}/{sra_run}.tsv", sra_run=IDS),
             clean_done = expand(CLEAN_RUN + "/{sra_run}/.{sra_run}.clean_data.done", sra_run=IDS),
         output:
