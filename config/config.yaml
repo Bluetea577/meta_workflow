@@ -102,6 +102,12 @@ host:
       spinach: plant/vegetables/spinach
       tomato: plant/vegetables/tomato
 
+###################
+# download_set
+###################
+# kingfisher
+kingfisher_method: "ena-ascp ena-ftp aws-http"
+kingfisher_ascp_args: "--ascp-args '-k 1'"
 
 ###################
 # Clean

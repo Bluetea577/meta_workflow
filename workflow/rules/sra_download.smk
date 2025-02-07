@@ -55,7 +55,9 @@ rule download_data:
         )),
         mark = touch(SRA_RUN + "/{sra_run}/.{sra_run}.sra_download.done"),
     params:
-        outdir = SRA_RUN + "/{sra_run}"
+        outdir = SRA_RUN + "/{sra_run}",
+        method = config.get("kingfisher_method","ena-ftp aws-http"),
+        ascp_args = config.get("kingfisher_ascp_args","")
     log:
         "logs/SRAdownload/download/{sra_run}.log"
     benchmark:
@@ -71,9 +73,10 @@ rule download_data:
         rm -rf {params.outdir}
         
         kingfisher get -r {wildcards.sra_run} \
-            -m ena-ftp aws-http \
+            -m {params.method} \
             -f fastq.gz \
             -t {threads} \
+            {params.ascp_args} \
             --output-directory {params.outdir} 2> {log}
         
         # pigz过于消耗资源时使用
