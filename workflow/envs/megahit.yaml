@@ -1,6 +1,6 @@
 channels:
-- defaults
-- bioconda
-- conda-forge
+  - defaults
+  - bioconda
+  - conda-forge
 dependencies:
-- megahit
+  - megahit

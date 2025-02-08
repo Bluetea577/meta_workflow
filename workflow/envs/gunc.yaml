@@ -1,7 +1,7 @@
 channels:
-- conda-forge
-- bioconda
-- defaults
+  - conda-forge
+  - bioconda
+  - defaults
 dependencies:
-- gunc=1.0
-- pandas=1.5.1
+  - gunc=1.0
+  - pandas=1.5.1
